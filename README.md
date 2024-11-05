@@ -19,14 +19,14 @@ This script fetches the latest research papers from arXiv, summarizes them using
 1. **Clone the repository:**
 
     ```sh
-    git clone https://github.com/yourusername/arxiv-twitter-bot.git
+    git clone git@github.com:skillsharer/arxiv-summarizer.git
     cd arxiv-twitter-bot
     ```
 
 2. **Create and activate a conda environment:**
 
     ```sh
-    conda create --name arxiv-twitter-bot python=3.8
+    conda create --name arxiv-twitter-bot python=3.12
     conda activate arxiv-twitter-bot
     ```
 
