@@ -5,10 +5,8 @@ import requests
 import tweepy
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-from datetime import datetime, timedelta
-load_dotenv()
 
-debug = False  # Set to True to run in debug mode, which doesn't post to Twitter
+load_dotenv()
 
 OPENAI_BEARER_TOKEN = os.getenv('OPENAI_BEARER_TOKEN')
 CONSUMER_KEY = os.getenv("CONSUMER_KEY")
@@ -35,51 +33,79 @@ def get_text(prompt, model="gpt-4o-mini"):
 
     return response
 
-# Authenticate to Twitter
-if not debug:
-    try:
-        client = tweepy.Client(
-            BEARER_TOKEN,
-            CONSUMER_KEY,
-            CONSUMER_SECRET,
-            ACCESS_TOKEN,
-            ACCESS_TOKEN_SECRET,
-            wait_on_rate_limit=True
-        )
-        print("Successfully authenticated to Twitter.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+def extract_first_image_from_pdf(pdf_path, image_dir, entry_id):
+    """Extracts the first image from a PDF and saves it as a PNG file."""
+    with fitz.open(pdf_path) as pdf_document:
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document.load_page(page_num)
+            for img_index, img in enumerate(page.get_images(full=True)):
+                xref = img[0]
+                pix = fitz.Pixmap(pdf_document, xref)
+                if pix.colorspace.n != 3:  # Check if the colorspace is not RGB
+                    pix = fitz.Pixmap(fitz.csRGB, pix)
+                image_path = os.path.join(image_dir, f"{entry_id}_image.png")
+                pix.save(image_path)
+                pix = None  # Clean up Pixmap object
+                print(f"Image extracted and saved to: {image_path}")
+                return image_path
+    print("No images found in PDF.")
+    return None
 
-# Set the search period to the past 1 day(s)
-start_date = (datetime.today() - timedelta(days=5)).strftime('%Y%m%d')
-end_date = datetime.today().strftime('%Y%m%d')
+def tweet_arxiv_papers(debug=False, days=1, max_results=10):
+    # Authenticate to Twitter
+    if not debug:
+        try:
+            client = tweepy.Client(
+                BEARER_TOKEN,
+                CONSUMER_KEY,
+                CONSUMER_SECRET,
+                ACCESS_TOKEN,
+                ACCESS_TOKEN_SECRET,
+                wait_on_rate_limit=True
+            )
+            auth = tweepy.OAuth1UserHandler(
+                CONSUMER_KEY,
+                CONSUMER_SECRET,
+                ACCESS_TOKEN,
+                ACCESS_TOKEN_SECRET
+            )
+            api = tweepy.API(auth)
+            print("Successfully authenticated to Twitter.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return
 
-# Define the search query for all arXiv categories with today's date
-search_query = arxiv.Search(
-    query=f"submittedDate:[{start_date}0000 TO {end_date}2359]",
-    max_results=10,
-    sort_by=arxiv.SortCriterion.SubmittedDate,
-    sort_order=arxiv.SortOrder.Descending
-)
+    # Set the search period
+    start_date = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
+    end_date = datetime.today().strftime('%Y%m%d')
 
-# Create a client instance
-arxiv_client = arxiv.Client()
+    # Define the search query
+    search_query = arxiv.Search(
+        query=f"submittedDate:[{start_date}0000 TO {end_date}2359]",
+        max_results=max_results,
+        sort_by=arxiv.SortCriterion.SubmittedDate,
+        sort_order=arxiv.SortOrder.Descending
+    )
 
-# Directory to save PDFs
-pdf_dir = "arxiv_papers"
-os.makedirs(pdf_dir, exist_ok=True)
+    # Create a client instance and folders for PDFs and images
+    arxiv_client = arxiv.Client()
+    pdf_dir = "arxiv_papers"
+    image_dir = "arxiv_images"
+    os.makedirs(pdf_dir, exist_ok=True)
+    os.makedirs(image_dir, exist_ok=True)
 
-# Retrieve and process the results
-results = list(arxiv_client.results(search_query))
-print(f"Number of results: {len(results)}")
+    # Retrieve and process the results
+    results = list(arxiv_client.results(search_query))
+    print(f"Number of results: {len(results)}")
 
-if not results:
-    print("No results found for today's date. Please check your query and try again.")
-else:
+    if not results:
+        print("No results found for the specified date range. Please check your query and try again.")
+        return
+
     if not debug:
         # Post the main tweet to start the thread
         main_tweet = client.create_tweet(
-            text="🚀 Ready to level up your knowledge? Dive into today’s top research findings from arXiv, hand-picked by AI!💡 #NewResearch #ArxivNews #ScienceDaily #AIInsights #MachineLearning #Breakthroughs #DataScienceDaily #FutureReady #TechResearch"
+            text="🌐 What's trending in research? Check out today’s top arXiv discoveries, hand-picked by AI! Ready to expand your horizon? 📈 Learn more in the thread:👇🏻 #AI #MachineLearning #Innovation #Research #Science #Physics #Chemistry #Biology"
         )
         main_tweet_id = main_tweet.data['id']  # Store the main tweet ID
 
@@ -91,33 +117,34 @@ else:
         result.download_pdf(filename=pdf_path)
 
         # Extract text from the PDF
+        text = ""
         with fitz.open(pdf_path) as pdf_document:
-            text = ""
             for page_num in range(pdf_document.page_count):
                 page = pdf_document.load_page(page_num)
                 text += page.get_text()
 
-        # Save the extracted text to a file
-        text_path = pdf_path.replace(".pdf", ".txt")
-        with open(text_path, "w", encoding="utf-8") as text_file:
-            text_file.write(text)
+        # Extract the first image from the PDF
+        image_path = extract_first_image_from_pdf(pdf_path, image_dir, result.entry_id.split('/')[-1])
 
-        print(f"Text extracted and saved to: {text_path}\n")
-
-        # Explain article with ChatGPT API
+        # Generate tweet text using ChatGPT
         prompt = (
-            "Summarize this article in a single tweet (under 280 characters) and include at least 5 relevant hashtags "
-            "to boost reach. Make it easy to understand and engaging for readers who are not experts in the topic. "
-            "Explain the research as simple as you can and elaborate on how the research results could impact our lives. " + text
+            "Craft a tweet-sized summary of this article, packed with 5+ relevant hashtags to maximize reach. Make it accessible and engaging for readers unfamiliar with the topic. Simplify the research findings, highlighting how the results could directly impact our daily lives and future. " + text
         )
-
-        # Call the ChatGPT API to generate an explanation
         explanation = get_text(prompt)
         print(f"{explanation} Source: {result.entry_id}\n")
 
+        # Post the explanation with an image if available
         if not debug:
-            # Tweet the explanation as a reply in the thread
-            client.create_tweet(text=f"{explanation} Source: {result.entry_id}", in_reply_to_tweet_id=main_tweet_id)
+            media_ids = []
+            if image_path:
+                media = api.media_upload(image_path)
+                media_ids.append(media.media_id)
+
+            client.create_tweet(
+                text=f"{explanation} Source: {result.entry_id}",
+                in_reply_to_tweet_id=main_tweet_id,
+                media_ids=media_ids if media_ids else None
+            )
 
     if not debug:
         # Final tweet to close the thread
@@ -125,3 +152,6 @@ else:
             text="🚀 That’s a wrap on today’s highlights! Make sure to follow for daily updates on the latest discoveries in science, tech, and beyond. Join our community of curious minds! 🌐✨ #AI #ResearchBuzz #StayUpdated #InnovationDaily",
             in_reply_to_tweet_id=main_tweet_id
         )
+
+# Run the function
+tweet_arxiv_papers(debug=False)
