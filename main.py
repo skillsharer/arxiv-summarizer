@@ -3,6 +3,8 @@ import fitz  # PyMuPDF
 import os
 import requests
 import tweepy
+import numpy as np
+from PIL import Image
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 
@@ -32,6 +34,66 @@ def get_text(prompt, model="gpt-4o-mini"):
         print(f"An error occurred: {e}")
 
     return response
+
+def extract_relevant_image_from_pdf(pdf_path, image_dir, entry_id):
+    """Extracts a relevant image from a PDF by analyzing surrounding text, checking for keywords in captions, 
+       and filtering based on color and size criteria."""
+    
+    # Keywords indicating potentially relevant images
+    keywords = ["figure", "graph", "diagram", "illustration", "results", "method", "conclusion"]
+    image_path = None
+    
+    with fitz.open(pdf_path) as pdf_document:
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document.load_page(page_num)
+            page_text = page.get_text("text").lower()  # Get text content in lowercase for keyword matching
+            
+            # Loop through each image on the page
+            for img_index, img in enumerate(page.get_images(full=True)):
+                xref = img[0]
+                pix = fitz.Pixmap(pdf_document, xref)
+                
+                # Convert to RGB if needed
+                if pix.colorspace.n != 3:
+                    try:
+                        pix = fitz.Pixmap(fitz.csRGB, pix)
+                    except:
+                        continue
+                
+                # Get image data
+                img_data = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                
+                # 1. Filter out black/blank images
+                img_array = np.array(img_data)
+                black_pixels_ratio = np.mean(np.all(img_array == [0, 0, 0], axis=2))
+                
+                if black_pixels_ratio > 0.8:  # Skip black/blank images
+                    continue
+                
+                # 2. Apply size threshold to skip small or irrelevant images
+                if img_data.width < 200 or img_data.height < 200:
+                    continue
+                
+                # Resize the image while maintaining aspect ratio
+                max_size = (800, 800)  # Define the maximum size for the image
+                img_data.thumbnail(max_size, Image.Resampling.NEAREST)
+                
+                # 3. Check for relevant keywords around image in the page text
+                surrounding_text = page_text[max(0, page_text.find(keywords[0])-100): page_text.find(keywords[0])+100]
+                if any(keyword in surrounding_text for keyword in keywords):
+                    
+                    # Save the image if it passes all filters
+                    image_path = os.path.join(image_dir, f"{entry_id}_image.png")
+                    img_data.save(image_path)
+                    pix = None  # Clean up Pixmap object
+                    print(f"Relevant image extracted and saved to: {image_path}")
+                    return image_path
+
+                pix = None  # Clean up Pixmap object if not saved
+
+    if image_path is None:
+        print("No relevant images found in PDF.")
+    return image_path
 
 def extract_first_image_from_pdf(pdf_path, image_dir, entry_id):
     """Extracts the first image from a PDF and saves it as a PNG file."""
@@ -105,7 +167,7 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
     if not debug:
         # Post the main tweet to start the thread
         main_tweet = client.create_tweet(
-            text="🌐 What's trending in research? Check out today’s top arXiv discoveries, hand-picked by AI! Ready to expand your horizon? 📈 Learn more in the thread:👇🏻 #AI #MachineLearning #Innovation #Research #Science #Physics #Chemistry #Biology"
+            text="🚀 Ever wondered what the future holds in science? Here are today's cutting-edge discoveries, handpicked just for you! Dive in and let your curiosity roam! 👇 #Arxiv #Science #Innovation #AI #Math #Physics #Chemistry #Machinelearning"
         )
         main_tweet_id = main_tweet.data['id']  # Store the main tweet ID
 
@@ -124,13 +186,13 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
                 text += page.get_text()
 
         # Extract the first image from the PDF
-        image_path = extract_first_image_from_pdf(pdf_path, image_dir, result.entry_id.split('/')[-1])
+        image_path = extract_relevant_image_from_pdf(pdf_path, image_dir, result.entry_id.split('/')[-1])
 
         # Generate tweet text using ChatGPT
         prompt = (
-            "Craft a tweet-sized summary of this article, packed with 5+ relevant hashtags to maximize reach. Make it accessible and engaging for readers unfamiliar with the topic. Simplify the research findings, highlighting how the results could directly impact our daily lives and future. " + text
+            "Craft a tweet-sized summary of this article. Start with a question to draw readers in, use a relatable analogy if possible, and end with a call to action. Explain the research findings in simple terms and highlight how they could impact everyday life. Include 3-4 targeted hashtags for better reach. " + text
         )
-        explanation = get_text(prompt)
+        explanation = ""#get_text(prompt)
         print(f"{explanation} Source: {result.entry_id}\n")
 
         # Post the explanation with an image if available
@@ -149,9 +211,9 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
     if not debug:
         # Final tweet to close the thread
         client.create_tweet(
-            text="🚀 That’s a wrap on today’s highlights! Make sure to follow for daily updates on the latest discoveries in science, tech, and beyond. Join our community of curious minds! 🌐✨ #AI #ResearchBuzz #StayUpdated #InnovationDaily",
+            text="🚀 That’s a wrap on today’s scientific wonders! Follow my account to stay updated on the latest discoveries that could shape tomorrow. 🌐✨ #Research #StayCurious #ScienceDaily",
             in_reply_to_tweet_id=main_tweet_id
         )
 
 # Run the function
-tweet_arxiv_papers(debug=False)
+tweet_arxiv_papers(debug=True, days=2)
