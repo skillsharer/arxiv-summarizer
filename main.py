@@ -4,6 +4,7 @@ import os
 import requests
 import tweepy
 import numpy as np
+import time
 from PIL import Image
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
@@ -29,6 +30,7 @@ def get_text(prompt, model="gpt-4o-mini"):
         }
         response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
         response = response.json()["choices"][0]["message"]["content"].replace('\n', '')
+        time.sleep(3) # Wait for 3 seconds to avoid rate limiting
     except Exception as e:
         response = ""
         print(f"An error occurred: {e}")
@@ -216,4 +218,4 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
         )
 
 # Run the function
-tweet_arxiv_papers(debug=True, days=2)
+tweet_arxiv_papers(debug=True)
