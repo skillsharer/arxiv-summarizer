@@ -194,7 +194,7 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
         prompt = (
             "Craft a tweet-sized summary of this article. Start with a question to draw readers in, use a relatable analogy if possible, and end with a call to action. Explain the research findings in simple terms and highlight how they could impact everyday life. Include 3-4 targeted hashtags for better reach. " + text
         )
-        explanation = ""#get_text(prompt)
+        explanation = get_text(prompt)
         print(f"{explanation} Source: {result.entry_id}\n")
 
         # Post the explanation with an image if available
