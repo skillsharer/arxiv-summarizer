@@ -8,6 +8,7 @@ import time
 from PIL import Image
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from pymupdf import FileDataError
 
 load_dotenv()
 
@@ -182,10 +183,15 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
 
         # Extract text from the PDF
         text = ""
-        with fitz.open(pdf_path) as pdf_document:
-            for page_num in range(pdf_document.page_count):
-                page = pdf_document.load_page(page_num)
-                text += page.get_text()
+        try:
+            with fitz.open(pdf_path) as pdf_document:
+                for page_num in range(pdf_document.page_count):
+                    page = pdf_document.load_page(page_num)
+                    text += page.get_text()
+        except FileDataError:
+            print(f"Failed to open file '{pdf_path}'. Skipping this document.")
+            continue
+
 
         # Extract the first image from the PDF
         image_path = extract_relevant_image_from_pdf(pdf_path, image_dir, result.entry_id.split('/')[-1])
