@@ -170,7 +170,7 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
     if not debug:
         # Post the main tweet to start the thread
         main_tweet = client.create_tweet(
-            text="🚀 Ever wondered what the future holds in science? Here are today's cutting-edge discoveries, handpicked just for you! Dive in and let your curiosity roam! 👇 #Arxiv #Science #Innovation #AI #Math #Physics #Chemistry #Machinelearning"
+            text="🚀 Ever wondered what the future holds in science? Here are today's cutting-edge discoveries, handpicked just for you! Dive in and let your curiosity roam! 👇"
         )
         main_tweet_id = main_tweet.data['id']  # Store the main tweet ID
 
@@ -198,7 +198,7 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
 
         # Generate tweet text using ChatGPT
         prompt = (
-            "Craft a tweet-sized summary of this article. Start with a question to draw readers in, use a relatable analogy if possible, and end with a call to action. Explain the research findings in simple terms and highlight how they could impact everyday life. Include 3-4 targeted hashtags for better reach. " + text
+            "Craft a tweet-sized summary of this article. Use a relatable analogy if possible, and end with a call to action. Explain the research findings in simple terms and highlight how they could impact everyday life." + text
         )
         explanation = get_text(prompt)
         print(f"{explanation} Source: {result.entry_id}\n")
@@ -219,9 +219,9 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=10):
     if not debug:
         # Final tweet to close the thread
         client.create_tweet(
-            text="🚀 That’s a wrap on today’s scientific wonders! Follow my account to stay updated on the latest discoveries that could shape tomorrow. 🌐✨ #Research #StayCurious #ScienceDaily",
+            text="🚀 That’s a wrap on today’s scientific wonders! Follow my account to stay updated on the latest discoveries that could shape tomorrow. 🌐✨",
             in_reply_to_tweet_id=main_tweet_id
         )
 
 # Run the function
-tweet_arxiv_papers(debug=True)
+tweet_arxiv_papers(debug=False)
