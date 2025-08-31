@@ -1235,9 +1235,7 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
 
     if not debug:
         # Post the main tweet to start the thread
-        main_tweet = client.create_tweet(
-            text=PromptTemplates.get_thread_opener(personality="viral")
-        )
+        main_tweet = client.create_tweet(text=PromptTemplates.get_thread_opener(personality="viral")
         main_tweet_id = main_tweet.data['id']  # Store the main tweet ID
 
     for result in results:
