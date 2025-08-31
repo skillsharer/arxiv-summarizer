@@ -289,9 +289,7 @@ class MessageTemplates:
     SEMANTIC_SCHOLAR_SEARCH = "Searching Semantic Scholar for author social links..."
     AUTHOR_PROGRESS = "[{current}/{total}] Looking up Twitter handle for: {author_name}"
     FOUND_VIA_SEMANTIC_SCHOLAR = "  ✓ Found via Semantic Scholar homepage: @{handle}"
-    FOUND_VIA_SEMANTIC_SCHOLAR_DETAILED = (
-        "  ✓ Found via Semantic Scholar detailed lookup: @{handle}"
-    )
+    FOUND_VIA_SEMANTIC_SCHOLAR_DETAILED = "  ✓ Found via Semantic Scholar detailed lookup: @{handle}"
     FOUND_VIA_ORCID = "  ✓ Found via ORCID: @{handle}"
     NO_HANDLE_FOUND = "  ✗ No Twitter handle found for {author_name}"
     CHECKING_DETAILED_PROFILE = "  → Checking detailed Semantic Scholar profile..."
