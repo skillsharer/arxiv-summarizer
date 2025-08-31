@@ -5,7 +5,7 @@ Handles finding Twitter handles for paper authors using ORCID and Semantic Schol
 
 import re
 import time
-
+import os
 import requests
 
 from prompts import MessageTemplates
@@ -203,7 +203,7 @@ def get_detailed_author_info_from_semantic_scholar(semantic_scholar_id):
     """
     try:
         author_url = f"https://api.semanticscholar.org/graph/v1/author/{semantic_scholar_id}"
-        headers = {"User-Agent": "ArxivSummarizer/1.0 (mailto:skillsharer@protonmail.com)"}
+        headers = {"User-Agent": f"ArxivSummarizer/1.0 (mailto:{os.getenv('TWITTER_EMAIL')})"}
 
         params = {"fields": "name,url,homepage,externalIds"}
 
