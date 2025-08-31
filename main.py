@@ -10,7 +10,7 @@ from PIL import Image, ImageOps
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from pymupdf import FileDataError
-from prompts import PromptTemplates, MessageTemplates
+from prompts import PromptTemplates, MessageTemplates, PaperScoringPrompts
 
 load_dotenv()
 
@@ -558,7 +558,201 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
     else:
         print("No images found in PDF.")
         return None
-def tweet_arxiv_papers(debug=False, days=5, max_results=10, enable_author_tagging=True):
+
+def score_papers_for_engagement(papers, max_papers=50):
+    """
+    Score papers for non-technical audience engagement using AI.
+    Returns a list of scored papers with metadata.
+    """
+    if len(papers) > max_papers:
+        papers = papers[:max_papers]  # Limit to avoid token limits
+    
+    # Prepare batch scoring prompt
+    paper_texts = []
+    for i, paper in enumerate(papers, 1):
+        paper_text = f"Paper {i}: {paper.title}\nAbstract: {paper.summary[:300]}...\n"  # Limit abstract length
+        paper_texts.append(paper_text)
+    
+    full_prompt = PaperScoringPrompts.BATCH_SCORING_PROMPT + "\n\n".join(paper_texts)
+    
+    # Get AI scoring
+    try:
+        print(f"🤖 Sending {len(papers)} papers to AI for scoring...")
+        scoring_response = get_text(full_prompt, model="gpt-4o-mini")
+        print(f"📝 AI Response Preview: {scoring_response[:200]}...")
+        return parse_paper_scores(scoring_response, papers)
+    except Exception as e:
+        print(f"Error scoring papers: {e}")
+        # Fallback: return papers with default scores
+        return [(paper, 5, "Default score", "Unknown") for paper in papers]
+
+def parse_paper_scores(scoring_response, papers):
+    """
+    Parse the AI scoring response into structured data.
+    Returns list of tuples: (paper, score, reason, area)
+    """
+    scored_papers = []
+    
+    # Handle both line-separated and space-separated formats
+    import re
+    
+    # Split by "Paper N:" pattern to get individual paper scores
+    paper_pattern = r'Paper (\d+):'
+    paper_matches = list(re.finditer(paper_pattern, scoring_response))
+    
+    for i, match in enumerate(paper_matches):
+        try:
+            paper_num = int(match.group(1))
+            if paper_num > len(papers):
+                continue
+                
+            paper = papers[paper_num - 1]
+            
+            # Extract the content for this paper (from current match to next match)
+            start_pos = match.end()
+            if i + 1 < len(paper_matches):
+                end_pos = paper_matches[i + 1].start()
+                content = scoring_response[start_pos:end_pos].strip()
+            else:
+                content = scoring_response[start_pos:].strip()
+            
+            # Extract score, reason, area using regex
+            score = 5  # default
+            reason = "No specific reason"
+            area = "Unknown"
+            
+            # Find Score=X pattern
+            score_match = re.search(r'Score=(\d+)', content)
+            if score_match:
+                score = int(score_match.group(1))
+            
+            # Find Reason="..." pattern (handle various quote styles)
+            reason_match = re.search(r'Reason="([^"]*)"', content)
+            if not reason_match:
+                reason_match = re.search(r"Reason='([^']*)'", content)
+            if not reason_match:
+                reason_match = re.search(r'Reason=([^,]*)', content)
+            
+            if reason_match:
+                reason = reason_match.group(1).strip().strip('"\'')
+            
+            # Find Area="..." pattern (handle various quote styles)
+            area_match = re.search(r'Area="([^"]*)"', content)
+            if not area_match:
+                area_match = re.search(r"Area='([^']*)'", content)
+            if not area_match:
+                area_match = re.search(r'Area=([^,\s]*)', content)
+            
+            if area_match:
+                area = area_match.group(1).strip().strip('"\'')
+            
+            scored_papers.append((paper, score, reason, area))
+            
+        except Exception as e:
+            print(f"Error parsing paper {paper_num}: {e}")
+            continue
+    
+    # If parsing failed completely, return papers with default scores
+    if not scored_papers and papers:
+        print("Parsing failed, using default scores for all papers")
+        return [(paper, 5, "Default score", "Unknown") for paper in papers[:10]]  # Limit fallback
+    
+    return scored_papers
+
+def select_diverse_papers(scored_papers, target_count=6):
+    """
+    Select a diverse set of high-quality papers from scored results.
+    Prioritizes high scores while ensuring diversity across research areas.
+    """
+    # Sort by score (descending)
+    sorted_papers = sorted(scored_papers, key=lambda x: x[1], reverse=True)
+    
+    # Track selected areas to ensure diversity
+    selected_areas = {}
+    selected_papers = []
+    
+    # First pass: select highest scoring papers with area diversity
+    for paper, score, reason, area in sorted_papers:
+        if len(selected_papers) >= target_count:
+            break
+        
+        # Prioritize high-scoring papers (7+) and ensure area diversity
+        if score >= 7:
+            area_count = selected_areas.get(area, 0)
+            # Limit to max 2 papers per area for diversity
+            if area_count < 2:
+                selected_papers.append((paper, score, reason, area))
+                selected_areas[area] = area_count + 1
+    
+    # Second pass: fill remaining slots with best available papers
+    if len(selected_papers) < target_count:
+        for paper, score, reason, area in sorted_papers:
+            if len(selected_papers) >= target_count:
+                break
+            
+            # Skip if already selected
+            if any(p[0] == paper for p in selected_papers):
+                continue
+            
+            # Accept papers with score 5+ if we need more
+            if score >= 5:
+                selected_papers.append((paper, score, reason, area))
+    
+    return selected_papers
+
+def smart_paper_search(days=1, max_fetch=80, target_papers=6):
+    """
+    Intelligent paper search that fetches more papers, scores them for engagement,
+    and selects the best diverse set for non-technical audiences.
+    """
+    # Start with the specified time range
+    search_attempts = 0
+    max_attempts = 3
+    all_papers = []
+    
+    while len(all_papers) < 20 and search_attempts < max_attempts:  # Ensure we have enough papers to choose from
+        current_days = days + (search_attempts * 1)  # Expand search window if needed
+        
+        start_date = (datetime.today() - timedelta(days=current_days)).strftime('%Y%m%d')
+        end_date = datetime.today().strftime('%Y%m%d')
+        
+        print(f"Search attempt {search_attempts + 1}: Looking for papers from {current_days} days back...")
+        
+        # Fetch papers
+        search_query = arxiv.Search(
+            query=f"submittedDate:[{start_date}0000 TO {end_date}2359]",
+            max_results=max_fetch,
+            sort_by=arxiv.SortCriterion.SubmittedDate,
+            sort_order=arxiv.SortOrder.Descending
+        )
+        
+        arxiv_client = arxiv.Client()
+        results = list(arxiv_client.results(search_query))
+        all_papers.extend(results)
+        
+        print(f"Found {len(results)} papers in this search (total: {len(all_papers)})")
+        search_attempts += 1
+    
+    if not all_papers:
+        print("No papers found in the expanded search period.")
+        return []
+    
+    print(f"Scoring {len(all_papers)} papers for engagement potential...")
+    
+    # Score papers for engagement
+    scored_papers = score_papers_for_engagement(all_papers)
+    
+    # Select diverse high-quality papers
+    selected_papers = select_diverse_papers(scored_papers, target_papers)
+    
+    print(f"Selected {len(selected_papers)} high-quality, diverse papers:")
+    for paper, score, reason, area in selected_papers:
+        print(f"  • {paper.title[:60]}... (Score: {score}/10, Area: {area})")
+        print(f"    Reason: {reason}")
+    
+    return [paper for paper, score, reason, area in selected_papers]
+
+def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging=True, use_smart_selection=True):
     # Authenticate to Twitter
     if not debug:
         try:
@@ -582,31 +776,36 @@ def tweet_arxiv_papers(debug=False, days=5, max_results=10, enable_author_taggin
             print(f"An error occurred: {e}")
             return
 
-    # Set the search period
-    start_date = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
-    end_date = datetime.today().strftime('%Y%m%d')
-
-    # Define the search query
-    search_query = arxiv.Search(
-        query=f"submittedDate:[{start_date}0000 TO {end_date}2359]",
-        max_results=max_results,
-        sort_by=arxiv.SortCriterion.SubmittedDate,
-        sort_order=arxiv.SortOrder.Descending
-    )
-
-    # Create a client instance and folders for PDFs and images
-    arxiv_client = arxiv.Client()
+    # Create folders for PDFs and images
     pdf_dir = "arxiv_papers"
     image_dir = "arxiv_images"
     os.makedirs(pdf_dir, exist_ok=True)
     os.makedirs(image_dir, exist_ok=True)
 
-    # Retrieve and process the results
-    results = list(arxiv_client.results(search_query))
-    print(f"Number of results: {len(results)}")
+    # Use smart paper selection or fallback to traditional method
+    if use_smart_selection:
+        print("🧠 Using smart paper selection for maximum engagement...")
+        results = smart_paper_search(days=days, target_papers=max_results)
+    else:
+        print("📚 Using traditional date-based paper search...")
+        # Traditional search logic (fallback)
+        start_date = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
+        end_date = datetime.today().strftime('%Y%m%d')
+        
+        search_query = arxiv.Search(
+            query=f"submittedDate:[{start_date}0000 TO {end_date}2359]",
+            max_results=max_results,
+            sort_by=arxiv.SortCriterion.SubmittedDate,
+            sort_order=arxiv.SortOrder.Descending
+        )
+        
+        arxiv_client = arxiv.Client()
+        results = list(arxiv_client.results(search_query))
+
+    print(f"Number of selected papers: {len(results)}")
 
     if not results:
-        print("No results found for the specified date range. Please check your query and try again.")
+        print("No results found. Please check your query and try again.")
         return
 
     if not debug:

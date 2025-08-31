@@ -143,6 +143,35 @@ class PromptTemplates:
         else:
             return Prompts.THREAD_CLOSER
 
+class PaperScoringPrompts:
+    """Prompts for scoring and ranking research papers"""
+    
+    BATCH_SCORING_PROMPT = """
+    You are an expert science communicator who helps non-technical audiences discover fascinating research. 
+    Score each paper below on a scale of 1-10 for NON-TECHNICAL AUDIENCE APPEAL based on:
+    
+    1. ACCESSIBILITY (3 points): How easily can this be explained to someone without a PhD?
+    2. REAL-WORLD IMPACT (3 points): Will this matter to people's daily lives or society?
+    3. WOW FACTOR (2 points): Is this surprising, counterintuitive, or exciting enough to share?
+    4. VISUAL POTENTIAL (2 points): Can we create engaging visuals/analogies from this?
+    
+    For each paper, provide EXACTLY this format (one line per paper):
+    Paper N: Score=X, Reason="brief reason", Area="research field"
+    
+    Be concise and use simple quotes. Here are the papers:
+    """
+    
+    DIVERSITY_FILTER_PROMPT = """
+    From this list of high-scoring papers, select 5-8 papers that provide good diversity across:
+    - Research areas (avoid too many AI papers, include physics, biology, etc.)
+    - Impact types (theoretical breakthroughs, practical applications, surprising findings)
+    - Complexity levels (mix of accessible and slightly more technical)
+    
+    Prioritize papers with scores 7+ but ensure variety. List the selected paper numbers only.
+    
+    Scored papers:
+    """
+
 class ViralContentTemplates:
     """Templates for creating viral, shareable content"""
     
