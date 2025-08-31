@@ -202,8 +202,10 @@ def get_detailed_author_info_from_semantic_scholar(semantic_scholar_id):
     Returns Twitter handle if found in author's profile.
     """
     try:
-        author_url = f"https://api.semanticscholar.org/graph/v1/author/{semantic_scholar_id}"
-        headers = {"User-Agent": f"ArxivSummarizer/1.0 (mailto:{os.getenv('TWITTER_EMAIL')})"}
+        twitter_email = os.getenv('TWITTER_EMAIL')
+        if not twitter_email:
+            twitter_email = "noreply@example.com"
+        headers = {"User-Agent": f"ArxivSummarizer/1.0 (mailto:{twitter_email})"}
 
         params = {"fields": "name,url,homepage,externalIds"}
 
