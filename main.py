@@ -782,7 +782,15 @@ def extract_relevant_image_from_pdf(pdf_path, image_dir, entry_id):
                 img_data.thumbnail(max_size, Image.Resampling.NEAREST)
                 
                 # 3. Check for relevant keywords around image in the page text
-                surrounding_text = page_text[max(0, page_text.find(keywords[0])-100): page_text.find(keywords[0])+100]
+                # Find the first occurrence of any keyword in the page text
+                first_pos = -1
+                for keyword in keywords:
+                    pos = page_text.find(keyword)
+                    if pos != -1 and (first_pos == -1 or pos < first_pos):
+                        first_pos = pos
+                if first_pos == -1:
+                    continue  # No keyword found, skip this image
+                surrounding_text = page_text[max(0, first_pos-100): first_pos+100]
                 if any(keyword in surrounding_text for keyword in keywords):
                     
                     # Save the image if it passes all filters
