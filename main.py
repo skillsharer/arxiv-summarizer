@@ -387,19 +387,25 @@ def get_twitter_handles_for_authors(authors):
     
     return author_handles
 
-def format_tweet_with_author_tags(base_text, authors, author_handles, max_length=280):
+def format_tweet_with_author_tags(base_text, authors, author_handles, max_length=4000):
     """
     Format tweet text with author tags, ensuring we stay within Twitter's character limit.
+    If no social media handles are found, mentions authors by name.
+    Note: Twitter now allows up to 4,000 characters for tweets.
     """
     # Start with the base text
     tweet_text = base_text
     
-    # Collect handles to tag
+    # Collect handles to tag and authors without handles
     handles_to_tag = []
+    authors_without_handles = []
+    
     for author in authors:
         author_name = str(author.name).strip()
         if author_name in author_handles:
             handles_to_tag.append(f"@{author_handles[author_name]}")
+        else:
+            authors_without_handles.append(author_name)
     
     # If we have handles to tag, add them
     if handles_to_tag:
@@ -427,6 +433,26 @@ def format_tweet_with_author_tags(base_text, authors, author_handles, max_length
             
             if added_handles:
                 tweet_text += " Authors: " + " ".join(added_handles)
+    
+    # If no social media handles found, mention authors by name (but keep it concise)
+    elif authors_without_handles:
+        # Only mention first 3 authors to avoid making tweet too long
+        authors_to_mention = authors_without_handles[:3]
+        if len(authors_without_handles) > 3:
+            author_names_string = ", ".join(authors_to_mention) + " et al."
+        else:
+            author_names_string = ", ".join(authors_to_mention)
+        
+        author_tag_string = f" Authors: {author_names_string}"
+        
+        # Check if adding author names would exceed character limit
+        if len(tweet_text) + len(author_tag_string) <= max_length:
+            tweet_text += author_tag_string
+        else:
+            # Try with just first author
+            single_author_string = f" Author: {authors_to_mention[0]}"
+            if len(tweet_text) + len(single_author_string) <= max_length:
+                tweet_text += single_author_string
     
     return tweet_text
 
@@ -508,9 +534,132 @@ def extract_first_image_from_pdf(pdf_path, image_dir, entry_id):
     print("No images found in PDF.")
     return None
 
+def is_quality_image(image_path, min_size=(200, 200), min_colors=20, max_text_ratio=0.8):
+    """
+    Determines if an image is suitable for inclusion in a GIF based on quality metrics.
+    
+    Args:
+        image_path (str): Path to the image file
+        min_size (tuple): Minimum width and height in pixels
+        min_colors (int): Minimum number of unique colors required
+        max_text_ratio (float): Maximum ratio of potential text pixels (0.0-1.0)
+    
+    Returns:
+        bool: True if image passes quality checks, False otherwise
+    """
+    try:
+        with Image.open(image_path) as img:
+            # Convert to RGB if needed
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            width, height = img.size
+            
+            # 1. Size filter - reject tiny images (likely icons, emojis, or symbols)
+            if width < min_size[0] or height < min_size[1]:
+                print(f"❌ Rejected {os.path.basename(image_path)}: Too small ({width}x{height})")
+                return False
+            
+            # 2. Aspect ratio filter - reject extremely narrow or wide images
+            aspect_ratio = width / height
+            if aspect_ratio < 0.2 or aspect_ratio > 5.0:
+                print(f"❌ Rejected {os.path.basename(image_path)}: Bad aspect ratio ({aspect_ratio:.2f})")
+                return False
+            
+            # Convert to numpy array for analysis
+            img_array = np.array(img)
+            
+            # 3. Color diversity filter - reject images with too few colors (likely simple graphics/text)
+            # Reshape to 2D array of RGB values and count unique colors more efficiently
+            pixels = img_array.reshape(-1, 3)
+            # Convert to tuples for proper hashing
+            unique_colors = len(set(map(tuple, pixels)))
+            
+            if unique_colors < min_colors:
+                print(f"❌ Rejected {os.path.basename(image_path)}: Too few colors ({unique_colors})")
+                return False
+            
+            # 4. Monochrome/blank image filter
+            # Check for mostly black, white, or single-color images
+            # Be more lenient for research figures which often have white backgrounds
+            total_pixels = width * height
+            
+            # Count black pixels
+            black_pixels = np.sum(np.all(img_array == [0, 0, 0], axis=2))
+            black_ratio = black_pixels / total_pixels
+            
+            # Count white pixels
+            white_pixels = np.sum(np.all(img_array == [255, 255, 255], axis=2))
+            white_ratio = white_pixels / total_pixels
+            
+            # Count near-white pixels (for PDFs with slight background color variations)
+            near_white_pixels = np.sum(np.all(img_array > [240, 240, 240], axis=2))
+            near_white_ratio = near_white_pixels / total_pixels
+            
+            # More lenient thresholds for research figures (they often have white backgrounds)
+            if black_ratio > 0.9 or (white_ratio > 0.95 and unique_colors < 10):
+                print(f"❌ Rejected {os.path.basename(image_path)}: Mostly monochrome (B:{black_ratio:.2f}, W:{white_ratio:.2f}, NW:{near_white_ratio:.2f})")
+                return False
+            
+            # 5. Simple edge detection using PIL filters (alternative to scipy)
+            # Convert to grayscale for edge detection
+            gray_img = img.convert('L')
+            gray_array = np.array(gray_img)
+            
+            # Simple edge detection using gradient calculation
+            # Calculate horizontal and vertical gradients
+            grad_x = np.abs(np.diff(gray_array, axis=1))
+            grad_y = np.abs(np.diff(gray_array, axis=0))
+            
+            # Pad to match original dimensions
+            grad_x_padded = np.pad(grad_x, ((0, 0), (0, 1)), mode='constant')
+            grad_y_padded = np.pad(grad_y, ((0, 1), (0, 0)), mode='constant')
+            
+            # Combine gradients
+            edges = grad_x_padded + grad_y_padded
+            
+            # Calculate edge density
+            edge_threshold = np.mean(edges) + np.std(edges)
+            edge_pixels = np.sum(edges > edge_threshold)
+            edge_ratio = edge_pixels / total_pixels
+            
+            if edge_ratio > max_text_ratio and unique_colors < 30:  # Only reject high-edge images if they also have few colors
+                print(f"❌ Rejected {os.path.basename(image_path)}: Likely text/simple graphics (edge ratio: {edge_ratio:.2f}, colors: {unique_colors})")
+                return False
+            
+            # 6. Content complexity check
+            # Calculate variance in pixel values as a measure of image complexity
+            variance = np.var(img_array)
+            if variance < 100:  # Very low variance suggests simple/uniform content
+                print(f"❌ Rejected {os.path.basename(image_path)}: Low content complexity (variance: {variance:.2f})")
+                return False
+            
+            # 7. Check for dominant single colors (emoji-like images)
+            # Count how many pixels are the most common color
+            from collections import Counter
+            # Convert pixels to tuples for proper counting
+            pixel_tuples = [tuple(pixel) for pixel in pixels]
+            color_counts = Counter(pixel_tuples)
+            most_common_color_count = color_counts.most_common(1)[0][1]
+            dominant_color_ratio = most_common_color_count / total_pixels
+            
+            # More lenient for research figures - they often have white backgrounds
+            # Only reject if it's a simple image (few colors) AND highly dominant color
+            if dominant_color_ratio > 0.95 and unique_colors < 15:
+                print(f"❌ Rejected {os.path.basename(image_path)}: Dominant single color ({dominant_color_ratio:.2f}) with few colors ({unique_colors})")
+                return False
+            
+            print(f"✅ Accepted {os.path.basename(image_path)}: Quality image ({width}x{height}, {unique_colors} colors, edge:{edge_ratio:.2f}, var:{variance:.0f})")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error analyzing {image_path}: {e}")
+        return False
+
 def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, duration=3000, size=(512, 512), transition_frames=8):
     """
-    Extracts all images from a PDF and creates a Twitter-compatible GIF file.
+    Extracts high-quality images from a PDF and creates a Twitter-compatible GIF file.
+    Now includes intelligent filtering to remove low-quality images like emojis, symbols, or text.
     
     Twitter GIF requirements:
     - Max 15MB file size
@@ -519,7 +668,10 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
     - Optimized for web
     - Smooth, appealing transitions
     """
-    images = []
+    all_images = []
+    quality_images = []
+    
+    # First pass: Extract all images
     with fitz.open(pdf_path) as pdf_document:
         for page_num in range(pdf_document.page_count):
             page = pdf_document.load_page(page_num)
@@ -530,18 +682,41 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
                     pix = fitz.Pixmap(fitz.csRGB, pix)
                 image_path = os.path.join(image_dir, f"{entry_id}_image_{page_num}_{img_index}.png")
                 pix.save(image_path)
-                images.append(image_path)
+                all_images.append(image_path)
                 pix = None  # Clean up Pixmap object
-                print(f"Image extracted and saved to: {image_path}")
-                if len(images) >= 6:  # Limit to 6 images for optimal viewing
+                print(f"📷 Extracted: {os.path.basename(image_path)}")
+                
+                if len(all_images) >= 12:  # Extract more initially to have options after filtering
                     break
+            if len(all_images) >= 12:
+                break
+    
+    print(f"\n🔍 Analyzing {len(all_images)} extracted images for quality...")
+    
+    # Second pass: Filter for quality images
+    for image_path in all_images:
+        if is_quality_image(image_path):
+            quality_images.append(image_path)
+        else:
+            # Remove low-quality images to save space
+            try:
+                os.remove(image_path)
+            except:
+                pass
+    
+    print(f"\n✨ Selected {len(quality_images)} quality images out of {len(all_images)} extracted")
+    
+    # Limit to best 6 images for optimal viewing
+    if len(quality_images) > 6:
+        quality_images = quality_images[:6]
+        print(f"📊 Using top {len(quality_images)} images for GIF")
 
-    if images:
-        # Create a Twitter-compatible GIF from the extracted images
+    if quality_images:
+        # Create a Twitter-compatible GIF from the filtered images
         gif_images = []
         
-        for i in range(len(images)):
-            img = Image.open(images[i])
+        for i in range(len(quality_images)):
+            img = Image.open(quality_images[i])
             img = ImageOps.pad(img, size, color="white")  # Use white padding for better visibility
             
             # Ensure image is in RGB mode
@@ -554,8 +729,8 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
                 gif_images.append(img.copy())
             
             # Add smooth transition to next image (if not the last image)
-            if i < len(images) - 1:
-                next_img = Image.open(images[i + 1])
+            if i < len(quality_images) - 1:
+                next_img = Image.open(quality_images[i + 1])
                 next_img = ImageOps.pad(next_img, size, color="white")
                 if next_img.mode != 'RGB':
                     next_img = next_img.convert('RGB')
@@ -578,17 +753,6 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
         frame_duration = max(120, duration // total_frames)  # Min 120ms per frame for smoother playback
         
         print(f"📹 Creating GIF with {total_frames} frames, {frame_duration}ms per frame")
-        
-        # Save GIF with Twitter-optimized settings
-        gif_images[0].save(
-            gif_path, 
-            save_all=True, 
-            append_images=gif_images[1:], 
-            duration=frame_duration,
-            loop=0,  # Infinite loop
-            optimize=True,  # Optimize for file size
-            disposal=2  # Clear frame before next one
-        )
         
         # Save GIF with Twitter-optimized settings
         gif_images[0].save(
@@ -624,10 +788,10 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
             )
         
         final_size = os.path.getsize(gif_path)
-        print(f"GIF created and saved to: {gif_path} ({final_size/1024/1024:.1f}MB)")
+        print(f"🎬 GIF created and saved to: {gif_path} ({final_size/1024/1024:.1f}MB)")
         return gif_path
     else:
-        print("No images found in PDF.")
+        print("❌ No quality images found in PDF after filtering.")
         return None
 
 def score_papers_for_engagement(papers, max_papers=100):
@@ -1097,8 +1261,15 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
         
         # Format tweet with author tags
         base_tweet = f"{explanation} Source: {result.entry_id}"
+        print(f"🔍 DEBUG - Base tweet: {base_tweet}")
+        print(f"🔍 DEBUG - About to call format_tweet_with_author_tags with:")
+        print(f"  - Authors: {[a.name for a in result.authors]}")
+        print(f"  - Handles: {author_handles}")
+        
         final_tweet = format_tweet_with_author_tags(base_tweet, result.authors, author_handles)
         
+        print(f"🔍 DEBUG - Final tweet result: {final_tweet}")
+        print(f"🔍 DEBUG - Final tweet length: {len(final_tweet)}")
         print(f"{final_tweet}\n")
 
         # Post the explanation with an image if available
@@ -1131,11 +1302,11 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
 # Run the function
 if __name__ == "__main__":
     tweet_arxiv_papers(
-        debug=False, 
+        debug=True, 
         enable_author_tagging=True, 
-        days=5, 
-        max_results=4,
+        days=3, 
+        max_results=10,
         use_smart_selection=True,
-        cleanup_files=True,  # Clean up files after processing
-        keep_pdfs=False      # Remove both PDFs and images
+        cleanup_files=False,  # Clean up files after processing
+        keep_pdfs=True      # Remove both PDFs and images
     )
