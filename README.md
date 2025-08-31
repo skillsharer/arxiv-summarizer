@@ -9,12 +9,13 @@ This script fetches the latest research papers from arXiv, summarizes them using
 - Summarizes the papers using OpenAI's GPT model.
 - Posts the summaries to Twitter as a thread.
 - **Author Tagging**: Automatically tags paper authors on Twitter using arXiv → ORCID → Twitter pipeline.
-- **Modular Prompts**: Separated prompts and templates for easy customization.
+- **Modular Architecture**: Clean, maintainable codebase with separated modules for each functionality.
+- **Modern Package Management**: Uses `uv` for fast dependency management and development tools.
 
 ## Requirements
 
-- Python 3.8+
-- [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip for package management
 
 ## Setup
 
@@ -22,23 +23,34 @@ This script fetches the latest research papers from arXiv, summarizes them using
 
     ```sh
     git clone git@github.com:skillsharer/arxiv-summarizer.git
-    cd arxiv-twitter-bot
+    cd arxiv-summarizer
     ```
 
-2. **Create and activate a conda environment:**
+2. **Install dependencies using uv (recommended):**
 
     ```sh
-    conda create --name arxiv-twitter-bot python=3.12
-    conda activate arxiv-twitter-bot
+    # Install uv if you don't have it
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    
+    # Install all dependencies
+    uv sync
+    
+    # Or install with dev dependencies for development
+    uv sync --dev
     ```
 
-3. **Install the required packages:**
+    **Alternative: Traditional setup with pip:**
 
     ```sh
+    # Create virtual environment
+    python -m venv .venv
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    
+    # Install dependencies
     pip install -r requirements.txt
     ```
 
-4. **Create a .env file in the root directory and add your API keys:**
+3. **Create a .env file in the root directory and add your API keys:**
 
     **Option 1: Traditional Twitter API (Tweepy)**
     ```env
@@ -84,10 +96,36 @@ To switch between methods, simply change `TWITTER_AUTH_METHOD` in your `.env` fi
 
 ## Usage
 
-Run the script:
+### Running the Application
 
+**With uv (recommended):**
 ```sh
-python main.py
+uv run python src/main.py
+```
+
+**With traditional Python:**
+```sh
+python src/main.py
+```
+
+### Development Commands
+
+**With uv:**
+```sh
+# Install all dependencies
+uv sync
+
+# Install with dev dependencies  
+uv sync --dev
+
+# Run development tools
+uv run black .        # Format code
+uv run isort .        # Sort imports  
+uv run mypy src/      # Type checking
+uv run pytest        # Run tests
+
+# Run your application
+uv run python src/main.py
 ```
 
 The script will:
@@ -104,6 +142,8 @@ The script will:
 You can customize the script behavior:
 
 ```python
+from src.main import tweet_arxiv_papers
+
 tweet_arxiv_papers(
     debug=True,              # Set to False for actual posting
     days=5,                  # Number of days to look back
@@ -127,7 +167,7 @@ For more details, see [AUTHOR_TAGGING.md](AUTHOR_TAGGING.md).
 The system uses modular prompts that can be easily customized:
 
 ```python
-from prompts import PromptTemplates
+from src.prompts import PromptTemplates
 
 # Different summary styles
 technical_prompt = PromptTemplates.get_summary_prompt(text, style="technical")
@@ -143,35 +183,91 @@ For more details, see [PROMPTS.md](PROMPTS.md).
 ## File Structure
 
 ```
-├── main.py                     # Main application logic
-├── prompts.py                  # Prompts and message templates
-├── requirements.txt            # Python dependencies
-├── README.md                   # This file
-├── AUTHOR_TAGGING.md          # Author tagging documentation
-├── PROMPTS.md                 # Prompts customization guide
-├── .env                       # Environment variables (create this)
-├── arxiv_papers/              # Downloaded PDFs (auto-created)
-├── arxiv_images/              # Extracted images (auto-created)
-└── test_*.py                  # Test scripts
+├── src/                       # Source code modules
+│   ├── main.py               # Main application logic
+│   ├── config.py             # Configuration and environment variables
+│   ├── twitter_auth.py       # Twitter authentication handling
+│   ├── twitter_client.py     # Twitter posting functionality
+│   ├── author_lookup.py      # Author Twitter handle discovery
+│   ├── pdf_processor.py      # PDF processing and image extraction
+│   ├── paper_search.py       # ArXiv paper search and AI scoring
+│   ├── openai_client.py      # OpenAI API interactions
+│   ├── prompts.py            # Prompts and message templates
+│   └── utils.py              # Utility functions
+├── pyproject.toml            # Modern Python project configuration
+├── uv.lock                   # Locked dependency versions
+├── requirements.txt          # Legacy dependency list
+├── README.md                 # This file
+├── AUTHOR_TAGGING.md         # Author tagging documentation
+├── PROMPTS.md                # Prompts customization guide
+├── .env                      # Environment variables (create this)
+├── arxiv_papers/             # Downloaded PDFs (auto-created)
+├── arxiv_images/             # Extracted images (auto-created)
+└── test_*.py                 # Test scripts
 ```
 
-## Key Files
+## Key Modules
 
-### main.py
-The main script that performs the following tasks:
-- Authenticates to Twitter.
-- Fetches papers from arXiv.
-- Looks up author Twitter handles.
-- Downloads and processes PDFs.
-- Generates summaries and posts to Twitter.
+### src/main.py
+The main orchestration script that coordinates all functionality:
+- Integrates all modules
+- Provides the main `tweet_arxiv_papers()` function
+- Handles the complete workflow from search to posting
 
-### prompts.py
-Contains all text templates and prompts:
+### src/config.py
+Central configuration management:
+- Environment variable handling
+- Global client configuration
+- Authentication method selection
+
+### src/twitter_auth.py
+Twitter authentication handling:
+- Supports both twikit and tweepy methods
+- Session management and validation
+- Fallback authentication guidance
+
+### src/twitter_client.py
+Twitter posting functionality:
+- Unified interface for both auth methods
+- Tweet formatting and media upload
+- Thread creation and author tagging
+
+### src/author_lookup.py
+Author Twitter handle discovery:
+- ORCID profile integration
+- Semantic Scholar API integration
+- Enhanced lookup algorithms with rate limiting
+
+### src/pdf_processor.py
+PDF processing and image extraction:
+- Text extraction from academic papers
+- Image quality filtering
+- GIF creation for Twitter media
+
+### src/paper_search.py
+ArXiv paper search and AI scoring:
+- Multi-topic paper discovery
+- AI-powered engagement scoring
+- Diversity optimization for paper selection
+
+### src/openai_client.py
+OpenAI API interactions:
+- GPT model integration
+- Summary generation
+- Viral tweet creation
+
+### src/prompts.py
+Prompts and message templates:
 - Summary generation prompts
 - Twitter thread templates
 - Status and error messages
 - Customizable prompt styles
-- Posts the summaries to Twitter.
+
+### src/utils.py
+Utility functions:
+- File management
+- Directory handling
+- Common helper functions
 
 ## Contributing
 

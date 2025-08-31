@@ -1,12 +1,14 @@
 """
 Prompts and text templates for the arXiv summarizer
 """
+
 import random
 from datetime import datetime
 
+
 class Prompts:
     """Collection of prompts and text templates used throughout the application"""
-    
+
     # OpenAI prompt for summarizing arXiv papers
     TWEET_SUMMARY_PROMPT = (
         "Craft a tweet-sized summary of this article. Start with a question to draw readers in, "
@@ -14,7 +16,7 @@ class Prompts:
         "findings in simple terms and highlight how they could impact everyday life. Include 3-4 "
         "targeted hashtags for better reach. "
     )
-    
+
     # Enhanced engaging prompt with growth strategies
     ENGAGING_SUMMARY_PROMPT = (
         "Create a viral-worthy summary of this research paper. Follow this structure:\n"
@@ -25,7 +27,7 @@ class Prompts:
         "Do not make bold or italic style, just plain text. "
         "Make it shareable, not just informative. Add personality and perspective. "
     )
-    
+
     # Personality-driven technical prompt
     TECHNICAL_WITH_PERSONALITY_PROMPT = (
         "Create a technical summary with personality for researchers and practitioners. "
@@ -33,54 +35,55 @@ class Prompts:
         "contrarian opinion at the end. What could go wrong? What are the limitations? "
         "Be skeptical but fair. Include relevant technical hashtags. "
     )
-    
+
     # Contrarian/skeptical style prompt
     CONTRARIAN_PROMPT = (
         "Take a skeptical but fair approach to this research. Summarize the findings but also "
         "highlight potential limitations, overhyped claims, or questions that remain unanswered. "
         "What should we be cautious about? End with a thought-provoking question. "
     )
-    
+
     # Twitter thread opener
     THREAD_OPENER = (
         "📚 Today's scientific breakthroughs could change everything! Dive into these handpicked "
         "discoveries. Knowledge is power! 👇 "
     )
-    
+
     # Twitter thread closer
     THREAD_CLOSER = (
         "🚀 That's a wrap on today's scientific wonders! Follow my account to stay updated on the "
         "latest discoveries that could shape tomorrow. "
     )
-    
+
     # Personality-driven thread openers
     VIRAL_THREAD_OPENER = (
         "🔥 Today's research could break the internet (or at least your assumptions)! "
         "Buckle up for discoveries that'll make you question everything. Thread 👇 "
     )
-    
+
     CONTRARIAN_THREAD_OPENER = (
         "📊 Time to burst some research bubbles! Today's papers look impressive on the surface, "
         "but let's dig deeper into what they REALLY mean. Skeptical thread 👇 "
     )
-    
+
     PERSONALITY_THREAD_CLOSER = (
         "💭 Hot take: Half of these papers won't replicate, but the other half might change your life. "
         "Follow for more research reality checks and the occasional gem! "
     )
 
+
 class PromptTemplates:
     """Dynamic prompt templates that can be customized"""
-    
+
     @staticmethod
     def get_summary_prompt(paper_text: str, style: str = "engaging") -> str:
         """
         Generate a summary prompt for a given paper text and style.
-        
+
         Args:
             paper_text (str): The full text of the research paper
             style (str): The style of summary ('engaging', 'viral', 'technical', 'contrarian')
-        
+
         Returns:
             str: The complete prompt including the paper text
         """
@@ -92,18 +95,18 @@ class PromptTemplates:
             base_prompt = Prompts.TECHNICAL_WITH_PERSONALITY_PROMPT
         elif style == "contrarian":
             base_prompt = Prompts.CONTRARIAN_PROMPT
-        
+
         return base_prompt + paper_text
-    
+
     @staticmethod
     def get_thread_opener(topic: str = None, personality: str = "default") -> str:
         """
         Get a thread opener, optionally customized for a specific topic and personality.
-        
+
         Args:
             topic (str): Optional topic to customize the opener
             personality (str): Style of opener ('default', 'viral', 'contrarian')
-        
+
         Returns:
             str: The thread opener text
         """
@@ -113,7 +116,7 @@ class PromptTemplates:
             base_opener = Prompts.CONTRARIAN_THREAD_OPENER
         else:
             base_opener = Prompts.THREAD_OPENER
-        
+
         if topic and personality == "default":
             return f"📚 Today's {topic} breakthroughs could change everything! Dive into these handpicked discoveries. Knowledge is power! 👇 "
         elif topic and personality == "viral":
@@ -122,16 +125,16 @@ class PromptTemplates:
             return f"🤔 Let's fact-check today's {topic} hype! Time to separate breakthrough from buzzword. Skeptical thread 👇 "
         else:
             return base_opener
-    
+
     @staticmethod
     def get_thread_closer(custom_message: str = None, personality: str = "viral") -> str:
         """
         Get a thread closer, optionally with a custom message or viral.
-        
+
         Args:
             custom_message (str): Optional custom closing message
             personality (str): Style of closer ('default', 'viral')
-        
+
         Returns:
             str: The thread closer text
         """
@@ -142,9 +145,10 @@ class PromptTemplates:
         else:
             return Prompts.THREAD_CLOSER
 
+
 class PaperScoringPrompts:
     """Prompts for scoring and ranking research papers"""
-    
+
     BATCH_SCORING_PROMPT = """
     You are an expert science communicator who helps non-technical audiences discover fascinating research. 
     Score each paper below on a scale of 1-10 for NON-TECHNICAL AUDIENCE APPEAL based on:
@@ -159,7 +163,7 @@ class PaperScoringPrompts:
     
     Be concise and use simple quotes. Here are the papers:
     """
-    
+
     DIVERSITY_FILTER_PROMPT = """
     From this list of high-scoring papers, select 5-8 papers that provide good diversity across:
     - Research areas (avoid too many AI papers, include physics, biology, etc.)
@@ -171,17 +175,18 @@ class PaperScoringPrompts:
     Scored papers:
     """
 
+
 class ViralContentTemplates:
     """Templates for creating viral, shareable content"""
-    
+
     @staticmethod
     def generate_why_it_matters(research_summary: str) -> str:
         """
         Generate a 'Why it matters:' statement for research.
-        
+
         Args:
             research_summary (str): Brief summary of the research
-            
+
         Returns:
             str: Prompt to generate a why-it-matters statement
         """
@@ -194,15 +199,15 @@ class ViralContentTemplates:
             "- 'Why it matters: could kill small startups relying on expensive inference APIs.'\n"
             "- 'Why it matters: your smartphone could soon run GPT-4 level AI locally.'"
         )
-    
+
     @staticmethod
     def generate_contrarian_take(research_summary: str) -> str:
         """
         Generate a contrarian or critical perspective on research.
-        
+
         Args:
             research_summary (str): Brief summary of the research
-            
+
         Returns:
             str: Prompt to generate a contrarian take
         """
@@ -215,15 +220,15 @@ class ViralContentTemplates:
             "- 'Sounds great until you consider the massive computational costs.'\n"
             "End with a thought-provoking question."
         )
-    
+
     @staticmethod
     def suggest_visual_content(research_topic: str) -> str:
         """
         Suggest visual content ideas for a research topic.
-        
+
         Args:
             research_topic (str): The main topic/field of research
-            
+
         Returns:
             str: Visual content suggestions
         """
@@ -234,7 +239,7 @@ class ViralContentTemplates:
             "3. A meme or diagram that explains the concept\n"
             "Keep visuals simple, shareable, and understandable at a glance."
         )
-    
+
     ENGAGEMENT_HOOKS = [
         "🚨 Plot twist:",
         "💡 Here's the thing:",
@@ -249,7 +254,7 @@ class ViralContentTemplates:
         "🔍 Food for thought:",
         "🧠 Think about this:",
     ]
-    
+
     DISCUSSION_STARTERS = [
         "What could go wrong here?",
         "Too good to be true?",
@@ -270,15 +275,16 @@ class ViralContentTemplates:
         "What’s the most exciting potential application?",
     ]
 
+
 class MessageTemplates:
     """Templates for various status and error messages"""
-    
+
     # Status messages
     PROCESSING_PAPER = "Processing: {title}"
     EXTRACTING_AUTHORS = "Authors: {authors}"
     ARXIV_ID_EXTRACTED = "Extracted arXiv ID: {arxiv_id}"
     AUTHOR_LOOKUP_COMPLETE = "Author lookup complete: {found}/{total} Twitter handles found"
-    
+
     # Author tagging messages
     SEMANTIC_SCHOLAR_SEARCH = "Searching Semantic Scholar for author social links..."
     AUTHOR_PROGRESS = "[{current}/{total}] Looking up Twitter handle for: {author_name}"
@@ -289,33 +295,38 @@ class MessageTemplates:
     CHECKING_DETAILED_PROFILE = "  → Checking detailed Semantic Scholar profile..."
     TRYING_ORCID_FALLBACK = "  → Semantic Scholar didn't find handle, trying ORCID..."
     PROGRESS_UPDATE = "  Progress: {found}/{processed} handles found so far"
-    
+
     # API messages
-    RATE_LIMITED_SEMANTIC_SCHOLAR = "Rate limited by Semantic Scholar API, waiting {seconds} seconds..."
+    RATE_LIMITED_SEMANTIC_SCHOLAR = (
+        "Rate limited by Semantic Scholar API, waiting {seconds} seconds..."
+    )
     RATE_LIMITED_AUTHOR_LOOKUP = "Rate limited on author lookup, waiting {seconds} seconds..."
     SEMANTIC_SCHOLAR_FAILED = "Semantic Scholar API failed with status {status_code}"
     ORCID_SEARCH_FAILED = "ORCID search failed with status {status_code}"
-    
+
     # Image processing messages
     IMAGE_EXTRACTED = "Image extracted and saved to: {path}"
     RELEVANT_IMAGE_EXTRACTED = "Relevant image extracted and saved to: {path}"
     NO_IMAGES_FOUND = "No images found in PDF."
     NO_RELEVANT_IMAGES = "No relevant images found in PDF."
     GIF_CREATED = "GIF created and saved to: {path}"
-    
+
     # General status messages
     RESULTS_COUNT = "Number of results: {count}"
-    NO_RESULTS_FOUND = "No results found for the specified date range. Please check your query and try again."
+    NO_RESULTS_FOUND = (
+        "No results found for the specified date range. Please check your query and try again."
+    )
     TWITTER_AUTH_SUCCESS = "Successfully authenticated to Twitter."
-    
+
     @staticmethod
     def format_message(template: str, **kwargs) -> str:
         """Format a message template with the provided arguments"""
         return template.format(**kwargs)
 
+
 class TweetVariations:
     """Generate slight variations in tweet content to avoid duplicates"""
-    
+
     THREAD_OPENERS = [
         "📚 Latest scientific breakthroughs! Dive into these handpicked discoveries. Knowledge is power! 👇",
         "🔬 Fresh research insights! Check out these fascinating discoveries. Science never sleeps! 👇",
@@ -329,9 +340,9 @@ class TweetVariations:
         "🌟 Shining a light on new research! Check out these exciting papers! 👇",
         "📖 Unlock the latest in science! Here are some must-read discoveries! 👇",
         "🧠 Expand your mind with today's top scientific findings! Dive in! 👇",
-        "💥 Explosive new research just in! Check out these groundbreaking papers! 👇"
+        "💥 Explosive new research just in! Check out these groundbreaking papers! 👇",
     ]
-    
+
     THREAD_CLOSERS = [
         "🚀 That's a wrap on today's scientific wonders! Follow for more daily discoveries! 🧬✨",
         "🔬 Hope you enjoyed this research roundup! More discoveries coming tomorrow! 🌟",
@@ -344,21 +355,21 @@ class TweetVariations:
         "🔬 Science is a never-ending adventure! Follow for more daily discoveries! 🚀",
         "🧪 Keep exploring the wonders of science! More exciting research coming soon!",
     ]
-    
+
     EMOJIS = ["🔬", "🧪", "⚡", "🚀", "🧬", "⭐", "💡", "🌟", "✨", "📚"]
-    
+
     @classmethod
     def get_unique_opener(cls):
         """Get a unique thread opener with timestamp and random variation"""
         current_time = datetime.now().strftime("%b %d, %H:%M")
         opener_template = random.choice(cls.THREAD_OPENERS)
         return opener_template.format(time=current_time)
-    
+
     @classmethod
     def get_unique_closer(cls):
         """Get a unique thread closer with random variation"""
         return random.choice(cls.THREAD_CLOSERS)
-    
+
     @classmethod
     def add_variation(cls, text, max_emojis=2):
         """Add slight variation to any tweet text"""
