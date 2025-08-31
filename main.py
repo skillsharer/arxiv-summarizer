@@ -508,8 +508,17 @@ def extract_first_image_from_pdf(pdf_path, image_dir, entry_id):
     print("No images found in PDF.")
     return None
 
-def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, duration=2000, size=(300, 300), transition_frames=20):
-    """Extracts all images from a PDF and creates a GIF file with a smooth transition between each image."""
+def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, duration=3000, size=(512, 512), transition_frames=8):
+    """
+    Extracts all images from a PDF and creates a Twitter-compatible GIF file.
+    
+    Twitter GIF requirements:
+    - Max 15MB file size
+    - Max 512x512 resolution (or 1280x1080 for landscape)
+    - Infinite loop
+    - Optimized for web
+    - Smooth, appealing transitions
+    """
     images = []
     with fitz.open(pdf_path) as pdf_document:
         for page_num in range(pdf_document.page_count):
@@ -524,36 +533,98 @@ def extract_images_and_create_gif(pdf_path, image_dir, entry_id, gif_path, durat
                 images.append(image_path)
                 pix = None  # Clean up Pixmap object
                 print(f"Image extracted and saved to: {image_path}")
-                if len(images) >= 10:
+                if len(images) >= 6:  # Limit to 6 images for optimal viewing
                     break
 
     if images:
-        # Create a GIF from the extracted images
+        # Create a Twitter-compatible GIF from the extracted images
         gif_images = []
-        for i in range(len(images) - 1):
-            img1 = Image.open(images[i])
-            img1 = ImageOps.pad(img1, size, color="black")  # Resize while keeping aspect ratio and adding black padding
-            img2 = Image.open(images[i + 1])
-            img2 = ImageOps.pad(img2, size, color="black")  # Resize while keeping aspect ratio and adding black padding
+        
+        for i in range(len(images)):
+            img = Image.open(images[i])
+            img = ImageOps.pad(img, size, color="white")  # Use white padding for better visibility
             
-            # Ensure both images are in the same mode (RGB)
-            if img1.mode != 'RGB':
-                img1 = img1.convert('RGB')
-            if img2.mode != 'RGB':
-                img2 = img2.convert('RGB')
+            # Ensure image is in RGB mode
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
             
-            gif_images.append(img1)
-            for j in range(1, transition_frames + 1):
-                blend = Image.blend(img1, img2, j / (transition_frames + 1))
-                gif_images.append(blend)
-        img_last = Image.open(images[-1])
-        img_last = ImageOps.pad(img_last, size, color="black")  # Resize while keeping aspect ratio and adding black padding
-        if img_last.mode != 'RGB':
-            img_last = img_last.convert('RGB')
-        gif_images.append(img_last)
+            # Hold each image for longer (multiple frames)
+            hold_frames = 8  # Show each image for 8 frames before transitioning
+            for _ in range(hold_frames):
+                gif_images.append(img.copy())
+            
+            # Add smooth transition to next image (if not the last image)
+            if i < len(images) - 1:
+                next_img = Image.open(images[i + 1])
+                next_img = ImageOps.pad(next_img, size, color="white")
+                if next_img.mode != 'RGB':
+                    next_img = next_img.convert('RGB')
+                
+                # Create smooth transition frames
+                for j in range(1, transition_frames + 1):
+                    alpha = j / (transition_frames + 1)
+                    # Use a smoother easing function for more natural transitions
+                    smooth_alpha = alpha * alpha * (3.0 - 2.0 * alpha)  # Smoothstep function
+                    blend = Image.blend(img, next_img, smooth_alpha)
+                    gif_images.append(blend)
+        
+        # Hold the last image for a bit longer before looping
+        final_hold_frames = 12
+        for _ in range(final_hold_frames):
+            gif_images.append(gif_images[-1].copy())
 
-        gif_images[0].save(gif_path, save_all=True, append_images=gif_images[1:], duration=duration // (transition_frames + 1), loop=0)
-        print(f"GIF created and saved to: {gif_path}")
+        # Calculate frame duration for smooth, appealing playback
+        total_frames = len(gif_images)
+        frame_duration = max(120, duration // total_frames)  # Min 120ms per frame for smoother playback
+        
+        print(f"📹 Creating GIF with {total_frames} frames, {frame_duration}ms per frame")
+        
+        # Save GIF with Twitter-optimized settings
+        gif_images[0].save(
+            gif_path, 
+            save_all=True, 
+            append_images=gif_images[1:], 
+            duration=frame_duration,
+            loop=0,  # Infinite loop
+            optimize=True,  # Optimize for file size
+            disposal=2  # Clear frame before next one
+        )
+        
+        # Save GIF with Twitter-optimized settings
+        gif_images[0].save(
+            gif_path, 
+            save_all=True, 
+            append_images=gif_images[1:], 
+            duration=frame_duration,
+            loop=0,  # Infinite loop
+            optimize=True,  # Optimize for file size
+            disposal=2  # Clear frame before next one
+        )
+        
+        # Check file size and reduce quality if too large
+        file_size = os.path.getsize(gif_path)
+        if file_size > 10 * 1024 * 1024:  # If larger than 10MB
+            print(f"⚠️  GIF too large ({file_size/1024/1024:.1f}MB), creating optimized version...")
+            
+            # Create a smaller, more optimized version
+            optimized_images = []
+            step = max(1, len(gif_images) // 20)  # Reduce to max 20 frames
+            for i in range(0, len(gif_images), step):
+                img = gif_images[i].resize((400, 400), Image.Resampling.LANCZOS)
+                optimized_images.append(img)
+            
+            optimized_images[0].save(
+                gif_path,
+                save_all=True,
+                append_images=optimized_images[1:],
+                duration=max(200, duration // len(optimized_images)),
+                loop=0,
+                optimize=True,
+                disposal=2
+            )
+        
+        final_size = os.path.getsize(gif_path)
+        print(f"GIF created and saved to: {gif_path} ({final_size/1024/1024:.1f}MB)")
         return gif_path
     else:
         print("No images found in PDF.")
@@ -851,6 +922,62 @@ def cleanup_old_files(pdf_dir="arxiv_papers", image_dir="arxiv_images", days_old
     print(f"✅ Cleanup complete! Removed {removed_count} old files.")
     return removed_count
 
+def upload_media_to_twitter(api, media_path):
+    """
+    Upload media to Twitter with proper handling for different file types.
+    
+    Args:
+        api: Twitter API instance
+        media_path (str): Path to the media file
+        
+    Returns:
+        str: Media ID if successful, None if failed
+    """
+    try:
+        if not os.path.exists(media_path):
+            print(f"⚠️  Media file not found: {media_path}")
+            return None
+        
+        file_size = os.path.getsize(media_path)
+        print(f"📁 Uploading {os.path.basename(media_path)} ({file_size / 1024 / 1024:.1f}MB)")
+        
+        # Check file type and size
+        if media_path.lower().endswith('.gif'):
+            # For GIF files, use specific Twitter requirements
+            if file_size > 15 * 1024 * 1024:  # 15MB limit for GIFs
+                print(f"⚠️  GIF file too large ({file_size / 1024 / 1024:.1f}MB), max 15MB")
+                return None
+            
+            # Use chunked upload for GIFs
+            media = api.chunked_upload(
+                filename=media_path,
+                media_category='tweet_gif',
+                additional_owners=None
+            )
+        else:
+            # For images (PNG, JPG)
+            if file_size > 5 * 1024 * 1024:  # 5MB limit for images
+                print(f"⚠️  Image file too large ({file_size / 1024 / 1024:.1f}MB), max 5MB")
+                return None
+            
+            media = api.media_upload(media_path)
+        
+        print(f"✅ Media uploaded successfully: {os.path.basename(media_path)}")
+        return media.media_id
+        
+    except Exception as e:
+        print(f"⚠️  Failed to upload media {media_path}: {e}")
+        print(f"🔄 Trying alternative upload method...")
+        
+        # Fallback: try regular upload even for GIFs
+        try:
+            media = api.media_upload(media_path)
+            print(f"✅ Media uploaded with fallback method: {os.path.basename(media_path)}")
+            return media.media_id
+        except Exception as e2:
+            print(f"❌ All upload methods failed: {e2}")
+            return None
+
 def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging=True, use_smart_selection=True, cleanup_files=True, keep_pdfs=False):
     """
     Main function to fetch, process, and tweet arXiv papers.
@@ -978,8 +1105,9 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
         if not debug:
             media_ids = []
             if image_path:
-                media = api.media_upload(image_path)
-                media_ids.append(media.media_id)
+                media_id = upload_media_to_twitter(api, image_path)
+                if media_id:
+                    media_ids.append(media_id)
 
             client.create_tweet(
                 text=final_tweet,
@@ -996,17 +1124,17 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
     if not debug:
         # Final tweet to close the thread
         client.create_tweet(
-            text=MessageTemplates.get_thread_closer(personality="viral"),
+            text=PromptTemplates.get_thread_closer(personality="viral"),
             in_reply_to_tweet_id=main_tweet_id
         )
 
 # Run the function
 if __name__ == "__main__":
     tweet_arxiv_papers(
-        debug=True, 
+        debug=False, 
         enable_author_tagging=True, 
-        days=1, 
-        max_results=10,
+        days=5, 
+        max_results=4,
         use_smart_selection=True,
         cleanup_files=True,  # Clean up files after processing
         keep_pdfs=False      # Remove both PDFs and images

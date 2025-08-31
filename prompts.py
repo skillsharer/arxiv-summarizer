@@ -42,27 +42,24 @@ class Prompts:
     # Twitter thread opener
     THREAD_OPENER = (
         "📚 Today's scientific breakthroughs could change everything! Dive into these handpicked "
-        "discoveries. Knowledge is power! 👇 #Arxiv #Science #Innovation #AI #Math #Physics "
-        "#Chemistry #Machinelearning"
+        "discoveries. Knowledge is power! 👇 "
     )
     
     # Twitter thread closer
     THREAD_CLOSER = (
         "🚀 That's a wrap on today's scientific wonders! Follow my account to stay updated on the "
-        "latest discoveries that could shape tomorrow. 🌐✨ #Research #StayCurious #ScienceDaily"
+        "latest discoveries that could shape tomorrow. "
     )
     
     # Personality-driven thread openers
     VIRAL_THREAD_OPENER = (
         "🔥 Today's research could break the internet (or at least your assumptions)! "
         "Buckle up for discoveries that'll make you question everything. Thread 👇 "
-        "#Science #Research #MindBlown"
     )
     
     CONTRARIAN_THREAD_OPENER = (
         "📊 Time to burst some research bubbles! Today's papers look impressive on the surface, "
         "but let's dig deeper into what they REALLY mean. Skeptical thread 👇 "
-        "#CriticalThinking #Research #FactCheck"
     )
     
     PERSONALITY_THREAD_CLOSER = (
@@ -116,11 +113,11 @@ class PromptTemplates:
             base_opener = Prompts.THREAD_OPENER
         
         if topic and personality == "default":
-            return f"📚 Today's {topic} breakthroughs could change everything! Dive into these handpicked discoveries. Knowledge is power! 👇 #Arxiv #Science #Innovation #{topic}"
+            return f"📚 Today's {topic} breakthroughs could change everything! Dive into these handpicked discoveries. Knowledge is power! 👇 "
         elif topic and personality == "viral":
-            return f"🔥 {topic} research is about to blow your mind! These discoveries will make you question everything you thought you knew. Thread 👇 #Science #{topic} #MindBlown"
+            return f"🔥 {topic} research is about to blow your mind! These discoveries will make you question everything you thought you knew. Thread 👇 "
         elif topic and personality == "contrarian":
-            return f"🤔 Let's fact-check today's {topic} hype! Time to separate breakthrough from buzzword. Skeptical thread 👇 #CriticalThinking #{topic} #FactCheck"
+            return f"🤔 Let's fact-check today's {topic} hype! Time to separate breakthrough from buzzword. Skeptical thread 👇 "
         else:
             return base_opener
     
@@ -246,7 +243,9 @@ class ViralContentTemplates:
         "🤯 Mind-bending fact:",
         "💭 Unpopular opinion:",
         "🌟 Game changer:",
-        "⚠️ Heads up:"
+        "⚠️ Heads up:",
+        "🔍 Food for thought:",
+        "🧠 Think about this:",
     ]
     
     DISCUSSION_STARTERS = [
@@ -259,7 +258,14 @@ class ViralContentTemplates:
         "What would you use this for?",
         "Thoughts? Am I being too skeptical?",
         "Who's this bad news for?",
-        "Revolutionary or incremental?"
+        "Revolutionary or incremental?",
+        "What’s the next step for this research?",
+        "How could this change daily life?",
+        "What’s the biggest limitation here?",
+        "Could this backfire in some way?",
+        "How does this compare to existing solutions?",
+        "What’s the ethical angle here?",
+        "What’s the most exciting potential application?",
     ]
 
 class MessageTemplates:
