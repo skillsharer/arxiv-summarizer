@@ -1,0 +1,9 @@
+**/arxiv_images
+**/arxiv_papers
+**/.env
+**/.vscode
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+**/.venv
+**/.mypy_cache
