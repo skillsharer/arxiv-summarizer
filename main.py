@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from pymupdf import FileDataError
 from prompts import PromptTemplates, MessageTemplates, PaperScoringPrompts
+import json
+import asyncio
+from tweet_variations import TweetVariations
 
 load_dotenv()
 
@@ -20,6 +23,279 @@ CONSUMER_SECRET = os.getenv("CONSUMER_SECRET")
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 BEARER_TOKEN = os.getenv("BEARER_TOKEN")
+
+# Twitter authentication method configuration
+TWITTER_AUTH_METHOD = os.getenv("TWITTER_AUTH_METHOD", "tweepy").lower()  # tweepy or twikit
+TWITTER_USERNAME = os.getenv("TWITTER_USERNAME")  # For twikit method
+TWITTER_PASSWORD = os.getenv("TWITTER_PASSWORD")  # For twikit method
+TWITTER_EMAIL = os.getenv("TWITTER_EMAIL")  # For twikit method (optional)
+
+# Global variables for Twitter clients
+twitter_client = None
+twitter_api = None
+twikit_client = None
+
+async def setup_twikit_client(force_reauth=False):
+    """Setup and authenticate twikit client with session persistence and validation"""
+    global twikit_client
+    
+    try:
+        from twikit import Client
+        
+        twikit_client = Client('en-US')
+        cookies_file = 'twitter_cookies.json'
+        
+        # Try to load existing cookies unless forced to re-authenticate
+        if not force_reauth and os.path.exists(cookies_file):
+            try:
+                twikit_client.load_cookies(cookies_file)
+                print("🍪 Loaded existing Twitter session cookies")
+                
+                # Validate the session by trying a simple operation
+                print("🔍 Validating session...")
+                try:
+                    # Test if we're properly authenticated
+                    await twikit_client.get_user_by_screen_name(TWITTER_USERNAME)
+                    print("✅ Session validation successful")
+                    return True
+                except Exception as e:
+                    print(f"⚠️  Session validation failed: {e}")
+                    print("🔄 Session expired, will re-authenticate...")
+                    # Remove invalid cookies
+                    try:
+                        os.remove(cookies_file)
+                    except:
+                        pass
+                    
+            except Exception as e:
+                print(f"⚠️  Failed to load cookies: {e}")
+        
+        # Fresh login required
+        if TWITTER_USERNAME and TWITTER_PASSWORD:
+            print("🔐 Performing fresh login to Twitter with twikit...")
+            try:
+                await twikit_client.login(
+                    auth_info_1=TWITTER_USERNAME,
+                    auth_info_2=TWITTER_EMAIL or TWITTER_USERNAME,
+                    password=TWITTER_PASSWORD
+                )
+                
+                # Save fresh cookies
+                twikit_client.save_cookies(cookies_file)
+                print("✅ Successfully authenticated with twikit and saved fresh session")
+                return True
+            except Exception as login_error:
+                print(f"❌ Login failed: {login_error}")
+                # Clean up any partial session files
+                try:
+                    if os.path.exists(cookies_file):
+                        os.remove(cookies_file)
+                except:
+                    pass
+                return False
+        else:
+            print("❌ Missing Twitter credentials for twikit method")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Twikit authentication setup failed: {e}")
+        return False
+
+def clear_twitter_session():
+    """Clear stored Twitter session cookies to force fresh authentication"""
+    cookies_file = 'twitter_cookies.json'
+    try:
+        if os.path.exists(cookies_file):
+            os.remove(cookies_file)
+            print("🧹 Cleared Twitter session cookies")
+            return True
+        else:
+            print("ℹ️  No session cookies found to clear")
+            return False
+    except Exception as e:
+        print(f"⚠️  Failed to clear session cookies: {e}")
+        return False
+
+def handle_twitter_auth_failure():
+    """Handle Twitter authentication failures with helpful suggestions"""
+    print("\n" + "="*60)
+    print("🚨 TWITTER AUTHENTICATION ISSUE DETECTED")
+    print("="*60)
+    print("Twitter has temporarily restricted login due to 'unusual activity'.")
+    print("This is common when using automation tools.")
+    print("\n📋 SOLUTIONS (try in order):")
+    print("1. ⏰ WAIT 15-30 minutes and try again")
+    print("2. 🌐 Log into Twitter manually in browser first")
+    print("3. 🔄 Switch to tweepy method temporarily:")
+    print("   Add to .env: TWITTER_AUTH_METHOD=tweepy")
+    print("4. 🧹 Clear session and retry:")
+    print("   python -c \"import main; main.clear_twitter_session()\"")
+    print("5. 🐛 Test with debug mode:")
+    print("   python -c \"import main; main.tweet_arxiv_papers(debug=True)\"")
+    print("\n💡 TIP: Tweepy method is more stable for production use!")
+    print("="*60 + "\n")
+
+def setup_tweepy_client():
+    """Setup traditional tweepy client"""
+    global twitter_client, twitter_api
+    
+    try:
+        twitter_client = tweepy.Client(
+            BEARER_TOKEN,
+            CONSUMER_KEY,
+            CONSUMER_SECRET,
+            ACCESS_TOKEN,
+            ACCESS_TOKEN_SECRET,
+            wait_on_rate_limit=True
+        )
+        auth = tweepy.OAuth1UserHandler(
+            CONSUMER_KEY,
+            CONSUMER_SECRET,
+            ACCESS_TOKEN,
+            ACCESS_TOKEN_SECRET
+        )
+        twitter_api = tweepy.API(auth)
+        print("✅ Successfully authenticated with tweepy")
+        return True
+    except Exception as e:
+        print(f"❌ Tweepy authentication failed: {e}")
+        return False
+
+async def send_tweet_twikit(text, media_paths=None, reply_to_id=None, retry_auth=True):
+    """Send tweet using twikit method with better rate limits and auth retry"""
+    global twikit_client
+    
+    try:
+        if not twikit_client:
+            success = await setup_twikit_client()
+            if not success:
+                return None
+        
+        # Upload media if provided
+        media_ids = []
+        if media_paths:
+            for media_path in media_paths:
+                if os.path.exists(media_path):
+                    media = await twikit_client.upload_media(media_path)
+                    media_ids.append(media)
+        
+        # Send tweet with reply if specified
+        if reply_to_id:
+            if media_ids:
+                tweet = await twikit_client.create_tweet(text=text, media_ids=media_ids, reply_to=reply_to_id)
+            else:
+                tweet = await twikit_client.create_tweet(text=text, reply_to=reply_to_id)
+        else:
+            if media_ids:
+                tweet = await twikit_client.create_tweet(text=text, media_ids=media_ids)
+            else:
+                tweet = await twikit_client.create_tweet(text=text)
+            
+        print(f"📤 Tweet sent successfully via twikit (ID: {tweet.id})")
+        return tweet.id
+        
+    except Exception as e:
+        error_msg = str(e)
+        
+        # Check for authentication errors
+        if ("401" in error_msg or "Could not authenticate" in error_msg or "code\":32" in error_msg) and retry_auth:
+            print(f"🔄 Authentication error detected, attempting fresh login...")
+            try:
+                # Force re-authentication
+                success = await setup_twikit_client(force_reauth=True)
+                if success:
+                    print("🔄 Retrying tweet with fresh authentication...")
+                    # Retry once with fresh auth (but don't retry again to avoid infinite loop)
+                    return await send_tweet_twikit(text, media_paths, reply_to_id, retry_auth=False)
+                else:
+                    print("❌ Re-authentication failed")
+                    handle_twitter_auth_failure()
+                    return None
+            except Exception as retry_error:
+                print(f"❌ Re-authentication attempt failed: {retry_error}")
+                if "unusual" in str(retry_error).lower() or "tiltás" in str(retry_error).lower():
+                    handle_twitter_auth_failure()
+                return None
+        elif "duplicate" in error_msg.lower() or "187" in error_msg:
+            print(f"⚠️  Duplicate tweet detected: {error_msg}")
+            print("💡 Tip: Try running again or modify the tweet content to make it unique")
+        elif "event loop" in error_msg.lower():
+            print(f"⚠️  Event loop error: {error_msg}")
+            print("💡 Tip: This is usually a temporary issue, try running again")
+        else:
+            print(f"❌ Failed to send tweet via twikit: {e}")
+        return None
+
+def send_tweet_tweepy(text, media_paths=None, reply_to_id=None):
+    """Send tweet using traditional tweepy method"""
+    global twitter_client, twitter_api
+    
+    try:
+        if not twitter_client:
+            success = setup_tweepy_client()
+            if not success:
+                return None
+        
+        # Upload media if provided
+        media_ids = []
+        if media_paths:
+            for media_path in media_paths:
+                if os.path.exists(media_path):
+                    media = twitter_api.media_upload(media_path)
+                    media_ids.append(media.media_id)
+        
+        # Send tweet with reply if specified
+        if reply_to_id:
+            if media_ids:
+                tweet = twitter_client.create_tweet(text=text, media_ids=media_ids, in_reply_to_tweet_id=reply_to_id)
+            else:
+                tweet = twitter_client.create_tweet(text=text, in_reply_to_tweet_id=reply_to_id)
+        else:
+            if media_ids:
+                tweet = twitter_client.create_tweet(text=text, media_ids=media_ids)
+            else:
+                tweet = twitter_client.create_tweet(text=text)
+            
+        print(f"📤 Tweet sent successfully via tweepy (ID: {tweet.data['id']})")
+        return tweet.data['id']
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "187" in error_msg:
+            print(f"⚠️  Duplicate tweet detected: {error_msg}")
+            print("💡 Tip: Try running again or modify the tweet content to make it unique")
+        else:
+            print(f"❌ Failed to send tweet via tweepy: {e}")
+        return None
+
+async def send_tweet_unified(text, media_paths=None):
+    """Unified tweet sending function that handles both authentication methods"""
+    if TWITTER_AUTH_METHOD == "twikit":
+        return await send_tweet_twikit(text, media_paths)
+    else:
+        return send_tweet_tweepy(text, media_paths)
+
+def send_tweet_sync(text, media_paths=None, reply_to_id=None):
+    """Synchronous wrapper for tweet sending with reply support"""
+    if TWITTER_AUTH_METHOD == "twikit":
+        # Handle async function with thread-based approach
+        import threading
+        import concurrent.futures
+        
+        def run_async_in_thread():
+            """Run async function in a separate thread with its own event loop"""
+            return asyncio.run(send_tweet_twikit(text, media_paths, reply_to_id))
+        
+        try:
+            # Always use thread-based approach to avoid event loop conflicts
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_async_in_thread)
+                return future.result(timeout=60)  # 60 second timeout
+        except Exception as e:
+            print(f"❌ Failed to send tweet via twikit (thread error): {e}")
+            return None
+    else:
+        return send_tweet_tweepy(text, media_paths, reply_to_id)
 
 def get_text(prompt, model="gpt-4o-mini"):
     try:
@@ -1178,28 +1454,17 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
         cleanup_files (bool): If True, removes files after processing
         keep_pdfs (bool): If True and cleanup_files=True, keeps PDFs but removes images
     """
-    # Authenticate to Twitter
+    # Authenticate to Twitter using selected method
     if not debug:
-        try:
-            client = tweepy.Client(
-                BEARER_TOKEN,
-                CONSUMER_KEY,
-                CONSUMER_SECRET,
-                ACCESS_TOKEN,
-                ACCESS_TOKEN_SECRET,
-                wait_on_rate_limit=True
-            )
-            auth = tweepy.OAuth1UserHandler(
-                CONSUMER_KEY,
-                CONSUMER_SECRET,
-                ACCESS_TOKEN,
-                ACCESS_TOKEN_SECRET
-            )
-            api = tweepy.API(auth)
-            print("Successfully authenticated to Twitter.")
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            return
+        if TWITTER_AUTH_METHOD == "twikit":
+            print(f"🔄 Using twikit authentication method (better rate limits)")
+            # Twikit requires async, we'll handle this in the tweet sending function
+        else:
+            print(f"🔄 Using tweepy authentication method (traditional API)")
+            success = setup_tweepy_client()
+            if not success:
+                print("❌ Authentication failed, exiting...")
+                return
 
     # Create folders for PDFs and images
     pdf_dir = "arxiv_papers"
@@ -1234,9 +1499,12 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
         return
 
     if not debug:
-        # Post the main tweet to start the thread
-        main_tweet = client.create_tweet(text=PromptTemplates.get_thread_opener(personality="viral")
-        main_tweet_id = main_tweet.data['id']  # Store the main tweet ID
+        # Post the main tweet to start the thread (with unique variation to avoid duplicates)
+        thread_opener = TweetVariations.get_unique_opener()
+        main_tweet_id = send_tweet_sync(thread_opener)
+        if not main_tweet_id:
+            print("❌ Failed to send main tweet, exiting...")
+            return
 
     for result in results:
         print(MessageTemplates.format_message(MessageTemplates.PROCESSING_PAPER, title=result.title))
@@ -1295,17 +1563,10 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
 
         # Post the explanation with an image if available
         if not debug:
-            media_ids = []
-            if image_path:
-                media_id = upload_media_to_twitter(api, image_path)
-                if media_id:
-                    media_ids.append(media_id)
-
-            client.create_tweet(
-                text=final_tweet,
-                in_reply_to_tweet_id=main_tweet_id,
-                media_ids=media_ids if media_ids else None
-            )
+            media_path_list = [image_path] if image_path and os.path.exists(image_path) else None
+            tweet_id = send_tweet_sync(final_tweet, media_path_list, reply_to_id=main_tweet_id)
+            if not tweet_id:
+                print("❌ Failed to send reply tweet")
 
         # Clean up files after processing (if enabled)
         if cleanup_files:
@@ -1315,19 +1576,21 @@ def tweet_arxiv_papers(debug=False, days=1, max_results=6, enable_author_tagging
 
     if not debug:
         # Final tweet to close the thread
-        client.create_tweet(
-            text=PromptTemplates.get_thread_closer(personality="viral"),
-            in_reply_to_tweet_id=main_tweet_id
+        final_tweet_id = send_tweet_sync(
+            TweetVariations.get_unique_closer(),
+            reply_to_id=main_tweet_id
         )
+        if not final_tweet_id:
+            print("❌ Failed to send closing tweet")
 
 # Run the function
 if __name__ == "__main__":
     tweet_arxiv_papers(
-        debug=True, 
+        debug=False, 
         enable_author_tagging=True, 
         days=5, 
         max_results=10,
         use_smart_selection=True,
-        cleanup_files=False,  # Clean up files after processing
+        cleanup_files=True,  # Clean up files after processing
         keep_pdfs=False      # Remove both PDFs and images
     )
