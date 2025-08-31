@@ -160,8 +160,6 @@ The script implements an automatic author tagging feature:
 2. **ORCID → Twitter**: Extracts Twitter handles from ORCID profiles  
 3. **Auto-tag**: Adds author tags to tweets when handles are found
 
-For more details, see [AUTHOR_TAGGING.md](AUTHOR_TAGGING.md).
-
 ### Customizing Prompts
 
 The system uses modular prompts that can be easily customized:
@@ -177,8 +175,6 @@ simple_prompt = PromptTemplates.get_summary_prompt(text, style="simple")
 ai_opener = PromptTemplates.get_thread_opener(topic="AI")
 custom_closer = PromptTemplates.get_thread_closer("Thanks for reading!")
 ```
-
-For more details, see [PROMPTS.md](PROMPTS.md).
 
 ## File Structure
 
@@ -198,12 +194,9 @@ For more details, see [PROMPTS.md](PROMPTS.md).
 ├── uv.lock                   # Locked dependency versions
 ├── requirements.txt          # Legacy dependency list
 ├── README.md                 # This file
-├── AUTHOR_TAGGING.md         # Author tagging documentation
-├── PROMPTS.md                # Prompts customization guide
 ├── .env                      # Environment variables (create this)
 ├── arxiv_papers/             # Downloaded PDFs (auto-created)
-├── arxiv_images/             # Extracted images (auto-created)
-└── test_*.py                 # Test scripts
+└── arxiv_images/             # Extracted images (auto-created)
 ```
 
 ## Key Modules
