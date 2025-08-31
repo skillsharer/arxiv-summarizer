@@ -10,10 +10,8 @@ from PIL import Image, ImageOps
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from pymupdf import FileDataError
-from prompts import PromptTemplates, MessageTemplates, PaperScoringPrompts
-import json
+from prompts import PromptTemplates, MessageTemplates, PaperScoringPrompts, TweetVariations
 import asyncio
-from tweet_variations import TweetVariations
 
 load_dotenv()
 

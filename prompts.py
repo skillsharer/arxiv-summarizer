@@ -1,6 +1,8 @@
 """
 Prompts and text templates for the arXiv summarizer
 """
+import random
+from datetime import datetime
 
 class Prompts:
     """Collection of prompts and text templates used throughout the application"""
@@ -310,3 +312,56 @@ class MessageTemplates:
     def format_message(template: str, **kwargs) -> str:
         """Format a message template with the provided arguments"""
         return template.format(**kwargs)
+
+class TweetVariations:
+    """Generate slight variations in tweet content to avoid duplicates"""
+    
+    THREAD_OPENERS = [
+        "📚 Latest scientific breakthroughs! Dive into these handpicked discoveries. Knowledge is power! 👇",
+        "🔬 Fresh research insights! Check out these fascinating discoveries. Science never sleeps! 👇",
+        "🧪 Today's scientific highlights! Explore these groundbreaking findings. Stay curious! 👇",
+        "⚡ Breaking: New research! These discoveries might change everything. Thread below! 👇",
+        "🚀 Science update! Fascinating new papers just dropped. Let's dive in! 👇",
+        "🧬 Discoveries that could reshape our understanding! Check them out below! 👇",
+        "✨ Science never stops! Here are the latest findings. Dive in! 👇",
+        "🔍 Dive into today's top scientific discoveries! Knowledge awaits! 👇",
+        "💡 Bright ideas from the world of science! Explore these discoveries! 👇",
+        "🌟 Shining a light on new research! Check out these exciting papers! 👇",
+        "📖 Unlock the latest in science! Here are some must-read discoveries! 👇",
+        "🧠 Expand your mind with today's top scientific findings! Dive in! 👇",
+        "💥 Explosive new research just in! Check out these groundbreaking papers! 👇"
+    ]
+    
+    THREAD_CLOSERS = [
+        "🚀 That's a wrap on today's scientific wonders! Follow for more daily discoveries! 🧬✨",
+        "🔬 Hope you enjoyed this research roundup! More discoveries coming tomorrow! 🌟",
+        "⚡ End of thread! Stay curious and keep exploring the frontiers of science! 🧪",
+        "🧬 Another day, another batch of amazing discoveries! See you tomorrow! 🚀",
+        "✨ Science never stops amazing us! Follow for your daily dose of discovery! 📚",
+        "💡 Thanks for joining this scientific journey! More insights await you tomorrow! 🔬",
+        "🌟 That's it for today! Keep following for more cutting-edge research!",
+        "📚 Stay tuned for more fascinating research updates! See you next time! ✨",
+        "🔬 Science is a never-ending adventure! Follow for more daily discoveries! 🚀",
+        "🧪 Keep exploring the wonders of science! More exciting research coming soon!",
+    ]
+    
+    EMOJIS = ["🔬", "🧪", "⚡", "🚀", "🧬", "⭐", "💡", "🌟", "✨", "📚"]
+    
+    @classmethod
+    def get_unique_opener(cls):
+        """Get a unique thread opener with timestamp and random variation"""
+        current_time = datetime.now().strftime("%b %d, %H:%M")
+        opener_template = random.choice(cls.THREAD_OPENERS)
+        return opener_template.format(time=current_time)
+    
+    @classmethod
+    def get_unique_closer(cls):
+        """Get a unique thread closer with random variation"""
+        return random.choice(cls.THREAD_CLOSERS)
+    
+    @classmethod
+    def add_variation(cls, text, max_emojis=2):
+        """Add slight variation to any tweet text"""
+        # Add random emoji at the end
+        emojis = random.sample(cls.EMOJIS, min(max_emojis, len(cls.EMOJIS)))
+        return f"{text} {''.join(emojis)}"
