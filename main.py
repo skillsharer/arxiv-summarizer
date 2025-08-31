@@ -766,15 +766,15 @@ def extract_relevant_image_from_pdf(pdf_path, image_dir, entry_id):
                 # Get image data
                 img_data = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 
-                # 1. Filter out black/blank images
+                # 1. Apply size threshold to skip small or irrelevant images before expensive analysis
+                if img_data.width < 200 or img_data.height < 200:
+                    continue
+                
+                # 2. Filter out black/blank images
                 img_array = np.array(img_data)
                 black_pixels_ratio = np.mean(np.all(img_array == [0, 0, 0], axis=2))
                 
                 if black_pixels_ratio > 0.8:  # Skip black/blank images
-                    continue
-                
-                # 2. Apply size threshold to skip small or irrelevant images
-                if img_data.width < 200 or img_data.height < 200:
                     continue
                 
                 # Resize the image while maintaining aspect ratio
