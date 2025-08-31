@@ -56,6 +56,10 @@ def get_orcid_from_name(author_name, max_results=5):
         # Clean and format the name for search
         clean_name = re.sub(r'[^\w\s]', '', author_name).strip()
         name_parts = clean_name.split()
+        
+        if not name_parts:  # Handle empty name case
+            return []
+            
         if len(name_parts) >= 2:
             first_name = name_parts[0]
             last_name = name_parts[-1]
@@ -74,10 +78,14 @@ def get_orcid_from_name(author_name, max_results=5):
         if response.status_code == 200:
             data = response.json()
             orcids = []
-            for result in data.get('result', []):
-                orcid_id = result.get('orcid-identifier', {}).get('path')
-                if orcid_id:
-                    orcids.append(orcid_id)
+            results = data.get('result', [])
+            if results:  # Check if results exist and is not None
+                for result in results:
+                    orcid_identifier = result.get('orcid-identifier')
+                    if orcid_identifier:  # Check if orcid-identifier exists
+                        orcid_id = orcid_identifier.get('path')
+                        if orcid_id:
+                            orcids.append(orcid_id)
             return orcids
         else:
             print(f"ORCID search failed with status {response.status_code}")
@@ -210,7 +218,7 @@ def get_author_info_from_semantic_scholar(arxiv_id):
                 return authors_info
                 
             elif response.status_code == 429:  # Rate limited
-                wait_time = 2 ** attempt  # Exponential backoff
+                wait_time = (2 ** attempt) + 1  # Exponential backoff: 3, 5, 9 seconds
                 print(MessageTemplates.format_message(MessageTemplates.RATE_LIMITED_SEMANTIC_SCHOLAR, seconds=wait_time))
                 time.sleep(wait_time)
                 continue
@@ -940,32 +948,47 @@ def smart_paper_search(days=1, max_fetch=100, target_papers=10):
     Intelligent paper search that fetches more papers, scores them for engagement,
     and selects the best diverse set for non-technical audiences.
     """
+    # Define different research topics/areas to search
+    research_topics = [
+        "cs.AI OR cs.LG OR cs.CV OR cs.CL",  # AI/ML/Computer Vision/NLP
+        "cs.RO OR cs.HC OR cs.CY",          # Robotics/Human-Computer Interaction/Cybersecurity  
+        "q-bio OR physics.bio-ph",          # Biology/Biophysics
+        "econ OR q-fin",                    # Economics/Finance
+        "stat.ML OR math.OC",               # Statistics/Optimization
+        "cs.DC OR cs.NI OR cs.CR",           # Distributed Computing/Networking/Cryptography
+        "astro-ph OR gr-qc OR hep-th",      # Astronomy/General Relativity/High Energy Physics
+        "cond-mat OR quant-ph",             # Condensed Matter/Quantum Physics
+        "math.PR OR math.ST",                # Probability/Statistics
+        "cs.SI OR cs.SE OR cs.CE"           # Social and Information Networks/Software Engineering/Computational Engineering
+    ]
+    
     # Start with the specified time range
     search_attempts = 0
-    max_attempts = 3
     all_papers = []
     
-    while len(all_papers) < 20 and search_attempts < max_attempts:  # Ensure we have enough papers to choose from
-        current_days = days + (search_attempts * 1)  # Expand search window if needed
+    for current_topic in research_topics:  # Ensure we have enough papers to choose from
         
-        start_date = (datetime.today() - timedelta(days=current_days)).strftime('%Y%m%d')
+        start_date = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
         end_date = datetime.today().strftime('%Y%m%d')
-        
-        print(f"Search attempt {search_attempts + 1}: Looking for papers from {current_days} days back...")
-        
-        # Fetch papers
+                
+        # Fetch papers with topic-specific query
         search_query = arxiv.Search(
-            query=f"submittedDate:[{start_date}0000 TO {end_date}2359]",
-            max_results=max_fetch,
+            query=f"submittedDate:[{start_date}0000 TO {end_date}2359] AND cat:{current_topic}",
+            max_results=max_fetch // len(research_topics),  # Distribute fetch quota across attempts
             sort_by=arxiv.SortCriterion.SubmittedDate,
-            sort_order=arxiv.SortOrder.Descending
+            sort_order=arxiv.SortOrder.Descending,
         )
         
         arxiv_client = arxiv.Client()
         results = list(arxiv_client.results(search_query))
-        all_papers.extend(results)
         
-        print(f"Found {len(results)} papers in this search (total: {len(all_papers)})")
+        # Deduplicate papers by entry_id to avoid duplicates
+        existing_ids = {paper.entry_id for paper in all_papers}
+        new_papers = [paper for paper in results if paper.entry_id not in existing_ids]
+        
+        all_papers.extend(new_papers)
+        
+        print(f"Found {len(results)} papers ({len(new_papers)} new) in {current_topic} (total: {len(all_papers)})")
         search_attempts += 1
     
     if not all_papers:
@@ -1304,9 +1327,9 @@ if __name__ == "__main__":
     tweet_arxiv_papers(
         debug=True, 
         enable_author_tagging=True, 
-        days=3, 
+        days=5, 
         max_results=10,
         use_smart_selection=True,
         cleanup_files=False,  # Clean up files after processing
-        keep_pdfs=True      # Remove both PDFs and images
+        keep_pdfs=False      # Remove both PDFs and images
     )
