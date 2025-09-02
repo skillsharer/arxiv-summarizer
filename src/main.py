@@ -182,6 +182,6 @@ if __name__ == "__main__":
         days=5,
         max_results=10,
         use_smart_selection=True,
-        cleanup_files=True,  # Clean up files after processing
-        keep_pdfs=False,  # Remove both PDFs and images
+        cleanup_files=False,  # Clean up files after processing
+        keep_pdfs=True,  # Remove both PDFs and images
     )

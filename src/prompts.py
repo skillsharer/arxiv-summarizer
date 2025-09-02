@@ -13,8 +13,8 @@ class Prompts:
     TWEET_SUMMARY_PROMPT = (
         "Craft a tweet-sized summary of this article. Start with a question to draw readers in, "
         "use a relatable analogy if possible, and end with a call to action. Explain the research "
-        "findings in simple terms and highlight how they could impact everyday life. Include 3-4 "
-        "targeted hashtags for better reach. "
+        "findings in simple terms and highlight how they could impact everyday life. "
+        "Dont use \"our\" or \"we\" (the author is not part of the research team). Keep it concise, engaging, and shareable. "
     )
 
     # Enhanced engaging prompt with growth strategies
@@ -26,6 +26,7 @@ class Prompts:
         "4. End with a mini-opinion or contrarian take that sparks discussion\n"
         "Do not make bold or italic style, just plain text. "
         "Make it shareable, not just informative. Add personality and perspective. "
+        "Dont use \"our\" or \"we\" (the author is not part of the research team). Keep it concise, engaging, and shareable. "
     )
 
     # Personality-driven technical prompt
@@ -33,7 +34,7 @@ class Prompts:
         "Create a technical summary with personality for researchers and practitioners. "
         "Include methodology, key findings, and implications. Add a critical perspective or "
         "contrarian opinion at the end. What could go wrong? What are the limitations? "
-        "Be skeptical but fair. Include relevant technical hashtags. "
+        "Be skeptical but fair."
     )
 
     # Contrarian/skeptical style prompt
@@ -41,6 +42,7 @@ class Prompts:
         "Take a skeptical but fair approach to this research. Summarize the findings but also "
         "highlight potential limitations, overhyped claims, or questions that remain unanswered. "
         "What should we be cautious about? End with a thought-provoking question. "
+        "Dont use \"our\" or \"we\" (the author is not part of the research team). Keep it concise, engaging, and shareable. "
     )
 
     # Twitter thread opener

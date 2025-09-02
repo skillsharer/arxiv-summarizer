@@ -26,25 +26,25 @@ from config import (
 
 async def setup_twikit_client(force_reauth=False):
     """Setup and authenticate twikit client with session persistence and validation"""
-    global twikit_client
+    import config
 
     try:
         from twikit import Client
 
-        twikit_client = Client("en-US")
+        config.twikit_client = Client("en-US")
         cookies_file = "twitter_cookies.json"
 
         # Try to load existing cookies unless forced to re-authenticate
         if not force_reauth and os.path.exists(cookies_file):
             try:
-                twikit_client.load_cookies(cookies_file)
+                config.twikit_client.load_cookies(cookies_file)
                 print("🍪 Loaded existing Twitter session cookies")
 
                 # Validate the session by trying a simple operation
                 print("🔍 Validating session...")
                 try:
                     # Try to get user info to validate session
-                    user = await twikit_client.get_user_by_screen_name(
+                    user = await config.twikit_client.get_user_by_screen_name(
                         TWITTER_USERNAME or "twitter"
                     )
                     if user:
@@ -62,14 +62,14 @@ async def setup_twikit_client(force_reauth=False):
         if TWITTER_USERNAME and TWITTER_PASSWORD:
             print("🔐 Performing fresh login to Twitter with twikit...")
             try:
-                await twikit_client.login(
+                await config.twikit_client.login(
                     auth_info_1=TWITTER_USERNAME,
                     auth_info_2=TWITTER_EMAIL or TWITTER_USERNAME,
                     password=TWITTER_PASSWORD,
                 )
 
                 # Save fresh cookies
-                twikit_client.save_cookies(cookies_file)
+                config.twikit_client.save_cookies(cookies_file)
                 print("✅ Successfully authenticated with twikit and saved fresh session")
                 return True
             except Exception as login_error:
@@ -128,10 +128,10 @@ def handle_twitter_auth_failure():
 
 def setup_tweepy_client():
     """Setup traditional tweepy client"""
-    global twitter_client, twitter_api
-
+    import config
+    
     try:
-        twitter_client = tweepy.Client(
+        config.twitter_client = tweepy.Client(
             BEARER_TOKEN,
             CONSUMER_KEY,
             CONSUMER_SECRET,
@@ -142,7 +142,7 @@ def setup_tweepy_client():
         auth = tweepy.OAuth1UserHandler(
             CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET
         )
-        twitter_api = tweepy.API(auth)
+        config.twitter_api = tweepy.API(auth)
         print("✅ Successfully authenticated with tweepy")
         return True
     except Exception as e:

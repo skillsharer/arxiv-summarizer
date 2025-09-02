@@ -13,10 +13,10 @@ from twitter_auth import handle_twitter_auth_failure, setup_tweepy_client, setup
 
 async def send_tweet_twikit(text, media_paths=None, reply_to_id=None, retry_auth=True):
     """Send tweet using twikit method with better rate limits and auth retry"""
-    global twikit_client
+    import config
 
     try:
-        if not twikit_client:
+        if not config.twikit_client:
             success = await setup_twikit_client()
             if not success:
                 return None
@@ -26,22 +26,22 @@ async def send_tweet_twikit(text, media_paths=None, reply_to_id=None, retry_auth
         if media_paths:
             for media_path in media_paths:
                 if os.path.exists(media_path):
-                    media_id = await twikit_client.upload_media(media_path)
+                    media_id = await config.twikit_client.upload_media(media_path)
                     media_ids.append(media_id)
 
         # Send tweet with reply if specified
         if reply_to_id:
             if media_ids:
-                tweet = await twikit_client.create_tweet(
+                tweet = await config.twikit_client.create_tweet(
                     text=text, media_ids=media_ids, reply_to=reply_to_id
                 )
             else:
-                tweet = await twikit_client.create_tweet(text=text, reply_to=reply_to_id)
+                tweet = await config.twikit_client.create_tweet(text=text, reply_to=reply_to_id)
         else:
             if media_ids:
-                tweet = await twikit_client.create_tweet(text=text, media_ids=media_ids)
+                tweet = await config.twikit_client.create_tweet(text=text, media_ids=media_ids)
             else:
-                tweet = await twikit_client.create_tweet(text=text)
+                tweet = await config.twikit_client.create_tweet(text=text)
 
         print(f"📤 Tweet sent successfully via twikit (ID: {tweet.id})")
         return tweet.id
@@ -80,10 +80,10 @@ async def send_tweet_twikit(text, media_paths=None, reply_to_id=None, retry_auth
 
 def send_tweet_tweepy(text, media_paths=None, reply_to_id=None):
     """Send tweet using traditional tweepy method"""
-    global twitter_client, twitter_api
+    import config
 
     try:
-        if not twitter_client:
+        if not config.twitter_client:
             success = setup_tweepy_client()
             if not success:
                 return None
@@ -93,22 +93,22 @@ def send_tweet_tweepy(text, media_paths=None, reply_to_id=None):
         if media_paths:
             for media_path in media_paths:
                 if os.path.exists(media_path):
-                    media = twitter_api.media_upload(media_path)
+                    media = config.twitter_api.media_upload(media_path)
                     media_ids.append(media.media_id)
 
         # Send tweet with reply if specified
         if reply_to_id:
             if media_ids:
-                tweet = twitter_client.create_tweet(
+                tweet = config.twitter_client.create_tweet(
                     text=text, media_ids=media_ids, in_reply_to_tweet_id=reply_to_id
                 )
             else:
-                tweet = twitter_client.create_tweet(text=text, in_reply_to_tweet_id=reply_to_id)
+                tweet = config.twitter_client.create_tweet(text=text, in_reply_to_tweet_id=reply_to_id)
         else:
             if media_ids:
-                tweet = twitter_client.create_tweet(text=text, media_ids=media_ids)
+                tweet = config.twitter_client.create_tweet(text=text, media_ids=media_ids)
             else:
-                tweet = twitter_client.create_tweet(text=text)
+                tweet = config.twitter_client.create_tweet(text=text)
 
         print(f"📤 Tweet sent successfully via tweepy (ID: {tweet.data['id']})")
         return tweet.data["id"]
