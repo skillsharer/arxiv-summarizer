@@ -330,33 +330,36 @@ class TweetVariations:
     """Generate slight variations in tweet content to avoid duplicates"""
 
     THREAD_OPENERS = [
-        "📚 Latest scientific breakthroughs! Dive into these handpicked discoveries. Knowledge is power! 👇",
-        "🔬 Fresh research insights! Check out these fascinating discoveries. Science never sleeps! 👇",
-        "🧪 Today's scientific highlights! Explore these groundbreaking findings. Stay curious! 👇",
-        "⚡ Breaking: New research! These discoveries might change everything. Thread below! 👇",
-        "🚀 Science update! Fascinating new papers just dropped. Let's dive in! 👇",
-        "🧬 Discoveries that could reshape our understanding! Check them out below! 👇",
-        "✨ Science never stops! Here are the latest findings. Dive in! 👇",
-        "🔍 Dive into today's top scientific discoveries! Knowledge awaits! 👇",
-        "💡 Bright ideas from the world of science! Explore these discoveries! 👇",
-        "🌟 Shining a light on new research! Check out these exciting papers! 👇",
-        "📖 Unlock the latest in science! Here are some must-read discoveries! 👇",
-        "🧠 Expand your mind with today's top scientific findings! Dive in! 👇",
-        "💥 Explosive new research just in! Check out these groundbreaking papers! 👇",
+        "🧠 If you read one science thread today, make it this — today’s breakthroughs in plain English, in under a minute 👇",
+        "🚀 The future just moved — here are today’s most important discoveries and why they matter (no jargon) 👇",
+        "⚡ 5-second summary, deep insights inside: today’s top research highlights you can explain at dinner 👇",
+        "🔬 Skip the hype, keep the signal — fresh findings distilled into takeaways you’ll actually remember 👇",
+        "👀 What just changed in science? Start here: clear, actionable takeaways from today’s papers 👇",
+        "💥 Lab to life: the discoveries that could touch your day sooner than you think — quick hits below 👇",
+        "🌍 Human knowledge moved an inch today — here’s where, and why it matters to you 👇",
+        "🔮 Feels like sci-fi, reads like reality — today’s most surprising results, decoded 👇",
+        "✨ Today’s research breakthroughs, explained like you’re five (but smarter) 👇",
+        "📚 Science is moving fast — here’s what you need to know from today’s papers 👇",
+        "🎢 Strap in for a quick tour of today’s wildest, most impactful research 👇",
+        "💡 Bright ideas from the lab, distilled into insights you can actually use 👇",
+        "🧬 From gene editing to AI leaps — today’s science highlights you can explain at dinner 👇",
+        "📈 Science that could change your world, explained in under a minute 👇",    
     ]
 
+
     THREAD_CLOSERS = [
-        "🚀 That's a wrap on today's scientific wonders! Follow for more daily discoveries! 🧬✨",
-        "🔬 Hope you enjoyed this research roundup! More discoveries coming tomorrow! 🌟",
-        "⚡ End of thread! Stay curious and keep exploring the frontiers of science! 🧪",
-        "🧬 Another day, another batch of amazing discoveries! See you tomorrow! 🚀",
-        "✨ Science never stops amazing us! Follow for your daily dose of discovery! 📚",
-        "💡 Thanks for joining this scientific journey! More insights await you tomorrow! 🔬",
-        "🌟 That's it for today! Keep following for more cutting-edge research!",
-        "📚 Stay tuned for more fascinating research updates! See you next time! ✨",
-        "🔬 Science is a never-ending adventure! Follow for more daily discoveries! 🚀",
-        "🧪 Keep exploring the wonders of science! More exciting research coming soon!",
+        "✅ Which finding surprised you most? Reply with the number and I’ll drop the paper — follow for tomorrow’s drop.",
+        "🧪 Your turn: which result would you fund, and why? I’ll feature the best takes next thread — follow to join in.",
+        "📚 Want the sources? Comment “papers” — I’ll share links. More discoveries land here tomorrow.",
+        "⚡ Save this thread to brief your team — and follow if you want a 60-second science digest daily.",
+        "🔍 Missed one? Ask for the summary by number — I’ll recap. New highlights arrive tomorrow.",
+        "🚀 If this was useful, share it with one curious friend — bigger drop coming in the next thread.",
+        "🌌 Today’s answers sparked better questions — add yours below, and I’ll hunt for data in the next post.",
+        "✨ Bookmark now, revisit later — and follow for a fresh set of breakthroughs every day.",
+        "📈 Want more? Follow for daily science highlights you can actually use.",
+        "💬 What should I cover next? Drop your topic requests below and I’ll hunt for the latest research.",
     ]
+
 
     EMOJIS = ["🔬", "🧪", "⚡", "🚀", "🧬", "⭐", "💡", "🌟", "✨", "📚"]
 
